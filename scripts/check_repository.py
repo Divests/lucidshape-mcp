@@ -10,7 +10,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = {
     '.gitignore', '.gitattributes', '.editorconfig',
-    'pyproject.toml', 'MANIFEST.in', 'README.md',
+    'pyproject.toml', 'MANIFEST.in', 'README.md', 'README.en.md',
 }
 SCRIPTS = {
     'bootstrap.py', 'verify_fresh_install.py', 'verify_harness_configs.py',

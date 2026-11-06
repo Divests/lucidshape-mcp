@@ -1,4 +1,4 @@
-include README.md pyproject.toml
+include README.md README.en.md pyproject.toml
 recursive-include lucidshape_mcp *.py *.do
 recursive-include docs *.md
 include examples/mcp.example.json

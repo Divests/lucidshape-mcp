@@ -1,5 +1,7 @@
 # LucidShape MCP
 
+**简体中文** | [English](README.en.md)
+
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB)](pyproject.toml)
 [![Platform Windows](https://img.shields.io/badge/Platform-Windows-0078D4)](docs/installation.md)
 [![Transport stdio](https://img.shields.io/badge/MCP-stdio-555555)](docs/harness-compatibility.md)

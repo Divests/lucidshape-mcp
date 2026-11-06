@@ -27,6 +27,17 @@ def main():
             env.pop(key)
     env['PYTHONDONTWRITEBYTECODE'] = '1'
     with tempfile.TemporaryDirectory(prefix='lucidshape-download-') as folder:
+        # Hosted Windows runners commonly expose TEMP through an 8.3 alias.
+        # Exercise that path spelling for all child processes on local runs too.
+        if os.name == 'nt':
+            import ctypes
+            buffer = ctypes.create_unicode_buffer(32768)
+            size = ctypes.windll.kernel32.GetShortPathNameW(folder, buffer, len(buffer))
+            if not 0 < size < len(buffer):
+                raise OSError('Could not resolve the Windows temporary directory alias')
+            env['TEMP'] = env['TMP'] = buffer.value
+            print('Child temporary paths: ' + ('Windows short names' if '~' in buffer.value
+                                               else 'long names (8.3 aliases unavailable)'), flush=True)
         clean = Path(folder) / '下载 with spaces'
         clean.mkdir()
         for record in records:
@@ -46,9 +57,9 @@ def main():
         if codex['mcp_servers']['lucidshape'] != spec:
             raise RuntimeError('JSON and TOML launch settings differ')
         python = Path(spec['command'])
-        environment = clean / 'local-data/venv'
+        environment = (clean / 'local-data/venv').resolve(strict=True)
         report = json.loads((config_dir / 'doctor.json').read_text(encoding='utf-8'))
-        if not Path(report['package_directory']).is_relative_to(environment):
+        if not Path(report['package_directory']).resolve(strict=True).is_relative_to(environment):
             raise RuntimeError('Checks accidentally imported source or global site-packages')
         if 'include-system-site-packages = false' not in (environment / 'pyvenv.cfg').read_text().lower():
             raise RuntimeError('Virtual environment inherits system dependencies')

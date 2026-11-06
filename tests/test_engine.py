@@ -107,7 +107,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         job = await self.completed(await self.engine.submit("inspect_model", model_path=str(source)))
         self.assertEqual(job["status"], "succeeded")
         self.assertEqual(job["result"]["objects"][0]["name"], "source")
-        self.assertEqual(job["inputs"][0]["source"], str(source))
+        self.assertEqual(job["inputs"][0]["source"], str(source.resolve()))
         self.assertTrue((self.root / job["job_id"] / "result.json").is_file())
 
     async def test_analysis_validation_and_structured_metrics(self):

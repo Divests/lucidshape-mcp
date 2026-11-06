@@ -41,6 +41,8 @@ def objects(rows):
 
 
 def read_report(directory: Path, template: str, parameters: dict) -> tuple[dict, list[str]]:
+    # Workers resolve the request directory, including Windows 8.3 aliases.
+    directory = directory.resolve()
     template = operation(template)
     path = directory / "engine-result.json"
     if path.stat().st_size > 8 * 1024 * 1024:
