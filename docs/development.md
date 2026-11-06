@@ -46,6 +46,8 @@ python scripts/verify_fresh_install.py --with-geometry
 
 该检查把 Git 可见源码复制到一个含中文和空格的临时目录，再执行 `bootstrap.py`。新虚拟环境不继承系统依赖，安装后的 MCP 从源码目录外启动；同时验证生成的 JSON/TOML 启动参数一致，逐份检查 14 种客户端配置的 MCP SDK 连接，并运行完整单元测试。需要联网获取依赖。它不复制本机 `local-data`、模型、兼容链接或已下载的几何运行库。
 
+安装阶段刻意使用 `PYTHONIOENCODING=cp1252:strict`，检查重定向输出遇到中文路径时仍能完成。安装器保留调用者选择的编码，只转义无法表示的字符；子进程继续使用 UTF-8。权限测试还覆盖 Windows 短路径与长路径指向同一允许目录的情况，并确认目录外的依赖仍被拒绝。
+
 `scripts/smoke_mcp.py` 继续覆盖旧的 `python -m lucidshape_mcp.server` 入口；新安装流程覆盖 `python -m lucidshape_mcp` 入口。
 
 `scripts/verify_harness_configs.py` 可以单独执行，但它调用 MCP SDK，不启动客户端应用。新增配置适配器时须补充其 JSON/TOML 字段契约测试和实际 stdio 启动检查，不能将这两项表述为第三方客户端实机认证。

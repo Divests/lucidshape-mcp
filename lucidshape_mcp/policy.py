@@ -48,6 +48,14 @@ class Policy:
     allowed_roots: tuple[Path, ...] = ()
     allow_source_writes: bool = False
 
+    def __post_init__(self):
+        # Direct construction must canonicalize paths just like from_env.
+        # Windows short names (e.g. RUNNER~1) identify the same physical roots.
+        object.__setattr__(self, 'work_dir', Path(self.work_dir).resolve())
+        object.__setattr__(self, 'allowed_roots', tuple(
+            Path(root).resolve(strict=True) for root in self.allowed_roots
+        ))
+
     @classmethod
     def from_env(cls, work_dir):
         groups = tuple(x.strip() for x in os.environ.get('LUCIDSHAPE_TOOLSETS', ','.join(DEFAULT_GROUPS)).split(',') if x.strip())

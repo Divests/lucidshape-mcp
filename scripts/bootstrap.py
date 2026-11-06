@@ -18,6 +18,11 @@ from lucidshape_mcp.policy import add_policy_arguments, apply_policy_arguments, 
 
 
 def main() -> int:
+    # Redirected Windows output may use cp1252 for Unicode installation paths.
+    # Keep the caller's encoding and escape only unrepresentable characters.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(errors='backslashreplace')
     parser = argparse.ArgumentParser(description=__doc__)
     add_policy_arguments(parser)
     parser.add_argument('--lucidshape-exe', default=os.environ.get('LUCIDSHAPE_EXE', ''))

@@ -36,7 +36,9 @@ def main():
         command = [sys.executable, '-B', str(clean / 'scripts/bootstrap.py')]
         if args.with_geometry:
             command.append('--with-geometry')
-        subprocess.run(command, cwd=folder, env=env, check=True)
+        # Exercise legacy redirected output even when the parent uses UTF-8.
+        bootstrap_env = {**env, 'PYTHONIOENCODING': 'cp1252:strict', 'PYTHONUTF8': '0'}
+        subprocess.run(command, cwd=folder, env=bootstrap_env, check=True)
         config_dir = clean / 'local-data/config'
         generated = json.loads((config_dir / 'mcp.local.json').read_text(encoding='utf-8'))
         codex = tomllib.loads((config_dir / 'codex.local.toml').read_text(encoding='utf-8'))

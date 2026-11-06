@@ -266,7 +266,7 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(PermissionError):
                     snapshot(model, work, 'input.lue')
                 self.assertFalse((work / 'input.lue').exists())
-                self.assertEqual(input_file(str(model), {'.lue'}), model)
+                self.assertEqual(input_file(str(model), {'.lue'}), model.resolve())
                 link = allowed / 'linked.ray'
                 try:
                     link.symlink_to(secret)
@@ -277,6 +277,39 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
                         input_file(str(link), {'.ray'})
             finally:
                 ACTIVE_POLICY.reset(token)
+
+    async def test_direct_policy_normalizes_roots_without_allowing_outside_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d).resolve()
+            allowed = root / 'allowed'; allowed.mkdir()
+            work = root / 'work'; work.mkdir()
+            model = allowed / 'model.lue'; model.write_bytes(b'model')
+            result = work / 'result.lid'; result.write_bytes(b'result')
+            outside = root / 'outside.ray'; outside.write_bytes(b'outside')
+            policy = Policy(work / '..' / 'work', allowed_roots=(allowed / '..' / 'allowed',))
+            self.assertEqual(policy.allowed_roots, (allowed,))
+            self.assertEqual(policy.work_dir, work)
+            self.assertEqual(policy.check_path(model), model)
+            self.assertEqual(policy.check_path(result), result)
+            with self.assertRaises(PermissionError):
+                policy.check_path(outside)
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows short path regression')
+    async def test_direct_policy_accepts_windows_short_path_roots(self):
+        import ctypes
+        with tempfile.TemporaryDirectory(prefix='mcp policy long path ') as d:
+            root = Path(d).resolve()
+            buffer = ctypes.create_unicode_buffer(32768)
+            size = ctypes.windll.kernel32.GetShortPathNameW(str(root), buffer, len(buffer))
+            self.assertGreater(size, 0)
+            self.assertLess(size, len(buffer))
+            short = Path(buffer.value)
+            if str(short).lower() == str(root).lower():
+                self.skipTest('Volume does not provide an alternate short path')
+            model = root / 'model.lue'; model.write_bytes(b'model')
+            policy = Policy(short / 'work', allowed_roots=(short,))
+            self.assertEqual(policy.check_path(short / model.name), model)
+            self.assertEqual(policy.check_path(model), model)
 
     async def test_invalid_policy_fails_before_registration(self):
         for values in ({'LUCIDSHAPE_TOOLSETS': 'unknown'}, {'LUCIDSHAPE_TOOLS': 'no_tool'},
