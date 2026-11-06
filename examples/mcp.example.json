@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "lucidshape": {
+      "command": "C:/tools/lucidshape-mcp/local-data/venv/Scripts/python.exe",
+      "args": ["-m", "lucidshape_mcp"],
+      "env": {
+        "LUCIDSHAPE_EXE": "C:/Program Files/LucidShape/BIN64GPU/lush.exe",
+        "LUCIDSHAPE_WORK_DIR": "C:/lucidshape-jobs",
+        "LUCIDSHAPE_TOOLSETS": "core,studio,catia,geometry,analysis,simulation",
+        "LUCIDSHAPE_TOOLS": "",
+        "LUCIDSHAPE_READ_ONLY": "false",
+        "LUCIDSHAPE_ALLOWED_ROOTS": "[]",
+        "LUCIDSHAPE_ALLOW_SOURCE_WRITES": "false"
+      }
+    }
+  }
+}

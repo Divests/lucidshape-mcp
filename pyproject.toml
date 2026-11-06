@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lucidshape-mcp"
+version = "0.8.0"
+description = "CATIA and LucidShape MCP with native existing-session DDE integration"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["mcp>=1.30.0,<2"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+analysis = ["numpy>=1.26,<3"]
+catia = ["pywin32>=311; sys_platform == 'win32'"]
+geometry = ["cadquery-ocp-novtk==7.9.3.0"]
+dev = ["build>=1.2,<2", "numpy>=1.26,<3"]
+
+[project.scripts]
+lucidshape-mcp = "lucidshape_mcp.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lucidshape_mcp*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+lucidshape_mcp = ["templates/*.do"]

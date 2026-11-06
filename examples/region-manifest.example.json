@@ -1,0 +1,22 @@
+{
+  "regions": [
+    {
+      "label": "cover_optic",
+      "path": "D:/OpticalProjects/example/cover_optic.step",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "cad_face_count": 1,
+      "native_top_level_object_count": 1,
+      "native_import_verified": false,
+      "include_in_optical_scene": true
+    },
+    {
+      "label": "reflector",
+      "path": "D:/OpticalProjects/example/reflector.step",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "cad_face_count": 1,
+      "native_top_level_object_count": 1,
+      "native_import_verified": false,
+      "include_in_optical_scene": true
+    }
+  ]
+}

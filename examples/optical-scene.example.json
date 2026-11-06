@@ -1,0 +1,119 @@
+{
+  "schema_version": "optical-scene/1",
+  "name": "example_project",
+  "length_unit": "mm",
+  "materials": {
+    "clear_glass": {
+      "kind": "refractive",
+      "index": 1.5,
+      "traversal_absorption_fraction": 0.01
+    },
+    "aluminum": {
+      "kind": "specular",
+      "reflectance": 0.85
+    }
+  },
+  "region_materials": {
+    "cover_optic": "clear_glass",
+    "reflector": "aluminum"
+  },
+  "rayfile": {
+    "path": "D:/OpticalProjects/example/source.ray",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "ray_count": 1000000,
+    "flux_lm": 100
+  },
+  "sources": [
+    {
+      "id": "left",
+      "position_mm": [
+        -2,
+        0,
+        0
+      ],
+      "frame": {
+        "x": [
+          1,
+          0,
+          0
+        ],
+        "y": [
+          0,
+          1,
+          0
+        ],
+        "z": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": "right",
+      "position_mm": [
+        2,
+        0,
+        0
+      ],
+      "frame": {
+        "x": [
+          1,
+          0,
+          0
+        ],
+        "y": [
+          0,
+          1,
+          0
+        ],
+        "z": [
+          0,
+          0,
+          1
+        ]
+      }
+    }
+  ],
+  "modes": {
+    "marker": [
+      "left"
+    ],
+    "boost": [
+      "left",
+      "right"
+    ]
+  },
+  "sensor": {
+    "bounds_deg": [
+      -30,
+      30,
+      -15,
+      15
+    ],
+    "grid_uv": [
+      600,
+      300
+    ],
+    "frame": {
+      "x": [
+        1,
+        0,
+        0
+      ],
+      "y": [
+        0,
+        1,
+        0
+      ],
+      "z": [
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "diagnostics": {
+    "coordinate_scale": 1
+  }
+}

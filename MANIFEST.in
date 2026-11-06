@@ -1,0 +1,24 @@
+include README.md pyproject.toml
+recursive-include lucidshape_mcp *.py *.do
+recursive-include docs *.md
+include examples/mcp.example.json
+include examples/optical-scene.example.json examples/region-manifest.example.json
+recursive-include tests *.py
+include tests/fixtures/invalid_model.lue tests/fixtures/known_intensity.lid
+include scripts/check_repository.py scripts/smoke_mcp.py scripts/verify_distribution.py
+include scripts/validate_full_mcp.py scripts/validate_optical_extensions.py
+include scripts/bootstrap.py scripts/verify_fresh_install.py
+include scripts/verify_harness_configs.py
+global-exclude __pycache__ *.py[cod] *.local.*
+prune work
+prune workspace
+prune local-data
+prune tmp
+prune results
+prune catia
+prune rayfile
+prune BOM
+prune documents
+prune learning
+prune standards
+prune 仿真数据
