@@ -133,7 +133,7 @@ local-data\venv\Scripts\python.exe -m lucidshape_mcp check
 
 ## 工具与使用流程
 
-当前版本 **0.8.0** 默认开放 **37 个工具**。启用 `experimental` 后为 **46 个**；`all` 另含 8 个旧别名，共 **54 个**。工具的参数和返回结构以客户端 `tools/list` 为准。
+当前版本 **0.8.0** 默认开放 **38 个工具**。启用 `experimental` 后为 **47 个**；`all` 另含 8 个旧别名，共 **55 个**。工具的参数和返回结构以客户端 `tools/list` 为准。
 
 | 任务 | 常用工具 |
 | --- | --- |
@@ -141,6 +141,7 @@ local-data\venv\Scripts\python.exe -m lucidshape_mcp check
 | 连接现有 LucidStudio | `studio_get_live_state`、`studio_inspect_current`、`studio_import_step` |
 | 计算已保存模型 | `inspect_model`、`simulate_model`、`run_parameter_sweep` |
 | 分析与导出配光 | `analyze_lid`、`compare_photometry`、`export_ies` |
+| 生成原生路照与驾驶员视角 | `generate_road_views` |
 | 管理任务 | `get_job`、`list_jobs`、`cancel_job`、`read_job_log` |
 
 例如，为已配置好光源、材料和传感器的模型生成配光文件：

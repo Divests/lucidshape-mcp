@@ -13,7 +13,7 @@ GROUPS = {
     'catia': {'catia_get_state', 'catia_inspect_part', 'catia_export_step', 'catia_show_all',
               'catia_create_plane_mirror', 'catia_convert_step_to_stl', 'catia_export_body_stl'},
     'geometry': {'inspect_cad_geometry', 'inspect_optical_region_topology', 'import_cad_geometry', 'cancel_geometry_job'},
-    'analysis': {'inspect_rayfile', 'analyze_lid', 'export_ies', 'compare_photometry', 'bin_rayfile', 'replay_rayfile_batch'},
+    'analysis': {'inspect_rayfile', 'analyze_lid', 'generate_road_views', 'export_ies', 'compare_photometry', 'bin_rayfile', 'replay_rayfile_batch'},
     'simulation': {'inspect_model', 'inspect_optical_parameters', 'set_emitter_parameters', 'simulate_model',
                    'run_parameter_sweep', 'submit_demo_simulation', 'prepare_cad_mirror_scene'},
     'experimental': {'preflight_optical_scene', 'validate_traversal_absorption', 'trace_optical_paths', 'merge_optical_batches',

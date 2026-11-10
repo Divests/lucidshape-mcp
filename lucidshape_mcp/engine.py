@@ -17,7 +17,7 @@ from .catia import parameters as catia_parameters
 from .inputs import input_file, snapshot
 from .results import read_report
 from . import optical_scene, path_sampling, kernel_regions, boundary_paths, mesh_repair, gpu_trace, gpu_merge, ray_replay
-from . import extensions
+from . import extensions, road_simulation
 from .config import geometry_available, geometry_runtime_path
 from .coordination import session_gate
 from .job_control import JobControl, utc_now
@@ -37,6 +37,7 @@ REPORT_TEMPLATES.add('trace_optical_gpu')
 REPORT_TEMPLATES.add('merge_optical_batches')
 REPORT_TEMPLATES.add('replay_rayfile_batch')
 REPORT_TEMPLATES.update(extensions.OPERATIONS)
+REPORT_TEMPLATES.add('generate_road_views')
 ERROR_LINE = re.compile(rb"^\s*(?:error\b|compile error\b|runtime error\b|do not understand\b|LUCIDSHAPE_MCP_FAILED:)", re.IGNORECASE)
 
 
@@ -99,6 +100,14 @@ class BatchEngine(JobControl):
                 "verified_engine_sha256": extensions.VERIFIED_ENGINE, "sweep_backend": "CPU",
                 "emitter_edit": "unique PointLight name; separate non-spectral LambertEmitter; preserve full constructor parameters and roundtrip selected source",
                 "comparison": "same actual sampling coordinates and angle type; signed candidate-reference CSV; no implicit resampling"},
+            "native_road_views": {
+                "tool": "generate_road_views", "backend": "LucidShape native road and luminance APIs",
+                "scope": "Saved candela photometry projected onto a flat road in an isolated job; not CAD retracing",
+                "coordinates": "X forward, Y left, Z up; metres",
+                "source_orientation": "Input photometry is already aimed; no additional pitch, scale or mirror",
+                "verified_engine_sha256": road_simulation.VERIFIED_ENGINE,
+                "live_studio_changed": False,
+            },
             "simulation_sensor_types": ["CandelaSensor", "LuxSensor", "LumenSensor", "Cdm2Sensor"],
             "live_studio_session": True,
             "live_studio": {"backend":"native Windows DDE and Studio Application API",
@@ -158,6 +167,33 @@ class BatchEngine(JobControl):
             record["inputs"], expected = extensions.stage(directory, operation, parameters)
         except Exception as error:
             record.update(status="failed", error=f"Optical staging failed: {error}")
+            self._save(record)
+            raise
+        return self._enqueue(record, expected)
+
+    async def submit_road_views(self, *, timeout_seconds: int = 180, **arguments) -> dict:
+        """Queue a fixed, source-preserving native road projection."""
+        self.policy.authorize("generate_road_views", arguments)
+        if not self.command or not Path(self.command[0]).is_file():
+            raise ValueError("Set LUCIDSHAPE_EXE to the installed lush.exe")
+        bounded_int(timeout_seconds, 1, 3600, "timeout_seconds")
+        if len(self._tasks) >= 16:
+            raise ValueError("Job queue is full")
+        parameters = road_simulation.validate(arguments)
+        executable = Path(self.command[0])
+        binary_hash = hashlib.sha256(executable.read_bytes()).hexdigest()
+        if binary_hash != road_simulation.VERIFIED_ENGINE:
+            raise ValueError("Native road views require the validated LS2.0 BIN64GPU engine profile")
+        job_id = uuid.uuid4().hex
+        directory = self._directory(job_id)
+        directory.mkdir(parents=True)
+        record = {"job_id": job_id, "template": "generate_road_views", "parameters": parameters,
+                  "status": "queued", "timeout_seconds": timeout_seconds, "artifacts": [],
+                  "engine_sha256": binary_hash}
+        try:
+            record["inputs"], expected = road_simulation.stage(directory, parameters, executable)
+        except Exception as error:
+            record.update(status="failed", error=f"Road-view staging failed: {error}")
             self._save(record)
             raise
         return self._enqueue(record, expected)
@@ -468,7 +504,7 @@ class BatchEngine(JobControl):
                 record['phase'] = 'waiting_for_session'
                 self._save(record)
                 await stack.enter_async_context(self.native_session())
-                if record["template"] in extensions.OPERATIONS and hashlib.sha256(Path(self.command[0]).read_bytes()).hexdigest() != record["engine_sha256"]:
+                if (record["template"] in extensions.OPERATIONS or record["template"] == "generate_road_views") and hashlib.sha256(Path(self.command[0]).read_bytes()).hexdigest() != record["engine_sha256"]:
                     raise ValueError("Native engine changed after submission")
                 record["status"] = "running"
                 record.update(phase='running', started_at=utc_now())
@@ -513,9 +549,12 @@ class BatchEngine(JobControl):
                     missing = [name for name in expected if not (directory / name).is_file() or (directory / name).stat().st_size == 0]
                     if process.returncode == 0 and marker_found and not missing and reported_error is None:
                         if record["template"] in REPORT_TEMPLATES:
-                            reader = extensions.read_report if record["template"] in extensions.OPERATIONS else read_report
-                            result, extra_files = reader(directory, record["template"], record["parameters"])
-                            if record["template"] in extensions.OPERATIONS:
+                            if record["template"] == "generate_road_views":
+                                result, extra_files = road_simulation.finalize(directory, record["parameters"])
+                            else:
+                                reader = extensions.read_report if record["template"] in extensions.OPERATIONS else read_report
+                                result, extra_files = reader(directory, record["template"], record["parameters"])
+                            if record["template"] in extensions.OPERATIONS or record["template"] == "generate_road_views":
                                 for item in record["inputs"]:
                                     if hashlib.sha256(Path(item["source"]).read_bytes()).hexdigest() != item["source_sha256"]:
                                         raise ValueError("Source or dependency changed during the isolated job")

@@ -17,11 +17,12 @@ MCP 客户端
 
 | 模块 | 责任 |
 | --- | --- |
-| `server.py` | 46 个规范工具入口、服务生命周期、环境配置；默认注册 37 个，另有 8 个旧别名 |
+| `server.py` | 47 个规范工具入口、服务生命周期、环境配置；默认注册 38 个，另有 8 个旧别名 |
 | `tool_api.py`、`contracts.py`、`policy.py` | 结构化响应、参数约束、行为标记、工具组和权限检查 |
 | `job_control.py`、`coordination.py` | 所有权锁、跨实例查询/取消、心跳、分页与跨进程会话锁 |
 | `config.py` | 用户可写的任务目录及可选几何库位置 |
 | `engine.py`、`results.py` | 调度、超时、记录、原生结果校验 |
+| `road_simulation.py` | 原生路照与驾驶员视角的参数约束、安装脚本快照和结果校验 |
 | `inputs.py` | 输入及依赖快照、路径与体积边界 |
 | `catia*` | 会话、零件检查、可验证文档归属及转换 |
 | `studio*`、`dde*`、`live_studio.py` | 原生 Studio 启动或已存在会话的受限操作 |

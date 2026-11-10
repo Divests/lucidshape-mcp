@@ -272,6 +272,23 @@ def create_server(engine: BatchEngine) -> FastMCP:
         return await engine.submit("analyze_lid", lid_path=lid_path, region_deg=region_deg, timeout_seconds=timeout_seconds)
 
     @tool()
+    async def generate_road_views(lid_path: str, lamp_positions_m: list[list[float]],
+                                  driver_position_m: list[float], road_bounds_m: list[float],
+                                  road_cell_size_m: float = 0.25, road_reflectance: float = 0.15,
+                                  view_bounds_deg: list[float] | None = None,
+                                  view_cell_size_deg: float = 0.05,
+                                  view_angles_deg: list[float] | None = None,
+                                  timeout_seconds: int = 180) -> dict:
+        """Generate native road illuminance and driver-view luminance from saved non-spectral candela photometry. X forward, Y left, Z up in metres. One or two lamp positions share the same already-aimed IES/LID, without mirror, extra aim or flux scaling. road_bounds_m=[forward_min,forward_max,left_min,left_max]; view_bounds_deg=[horizontal_min,horizontal_max,vertical_min,vertical_max]; view_angles_deg=[rotation,tilt,roll] uses the supported native camera profile. Flat Lambertian road uses explicit road_reflectance. Private batch only: no changes to Studio or source files, no CAD retracing, shadows or regulatory certification. Poll get_job for validated native LID data, images and metadata."""
+        return await engine.submit_road_views(lid_path=lid_path, lamp_positions_m=lamp_positions_m,
+            driver_position_m=driver_position_m, road_bounds_m=road_bounds_m,
+            road_cell_size_m=road_cell_size_m, road_reflectance=road_reflectance,
+            view_bounds_deg=[-20,20,-12,8] if view_bounds_deg is None else view_bounds_deg,
+            view_cell_size_deg=view_cell_size_deg,
+            view_angles_deg=[0,0,0] if view_angles_deg is None else view_angles_deg,
+            timeout_seconds=timeout_seconds)
+
+    @tool()
     def get_job(job_id: str) -> dict:
         """Read task status, input snapshot manifest, structured result (when available), and verified local artifact paths."""
         return engine.get_job(job_id)
