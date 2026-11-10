@@ -44,6 +44,8 @@ local-data\venv\Scripts\python.exe -m lucidshape_mcp configure --harness all --l
 
 VS Code 当前提供多种 harness 和配置目标：本地 `.vscode/mcp.json` 与 Copilot 便携配置的结构不同，分别选择 `vscode`、`copilot-cli` 输出。Windsurf 的官方文档目前跳转到 Devin Desktop，因此旧版客户端应以设置中打开的实际配置文件为准。生成器不自动查找、迁移或改写这些客户端文件。
 
+DeepSeek Harness（DSH）不读取 `mcpServers` JSON，也不在上述生成文件中：它的 MCP 客户端是内置插件，需要在 profile 里安装一个配置型组合包。接入步骤、字段对应关系和必须注意的解释器位置要求见 [DSH 接入](dsh.md)。
+
 所有输出使用已安装 Python 的绝对路径、参数数组和显式任务目录。路径支持中文和空格，不依赖工作目录、激活虚拟环境、`cmd /c` 或复制本机 `PYTHONPATH`。生成的绝对路径属于本机配置，不应上传 Git；换电脑重新运行安装脚本。
 
 ## 验证层级与范围

@@ -54,6 +54,7 @@ Choose the appropriate file from `local-data/config/`, merge its server entry in
 | Codex | `codex.local.toml` |
 | OpenCode | `opencode.local.json` |
 | Other clients | See [all 14 configurations](docs/harness-compatibility.md#客户端与配置文件) |
+| DeepSeek Harness (DSH) | No generated file — install a configuration-only bundle; see [DSH setup](docs/dsh.md) |
 
 Configurations use your local interpreter and absolute paths. Regenerate them after switching computers or moving the project directory.
 
@@ -169,6 +170,7 @@ The detailed guides under `docs/` are currently available in Simplified Chinese.
 | --- | --- |
 | [Installation guide](docs/installation.md) | Installation, upgrades, environment diagnostics, and FAQ |
 | [Client compatibility](docs/harness-compatibility.md) | Client configuration formats and where to configure them |
+| [DSH setup](docs/dsh.md) | DeepSeek Harness bundle wiring, field mapping, and the low-integrity-level trap |
 | [Tool reference](docs/tools.md) | Tool purposes, parameters, and execution boundaries |
 | [Scene configuration and migration](docs/generalization.md) | Materials, light sources, regions, operating cases, and migration from legacy interfaces |
 | [Jobs and permissions](docs/operations.md) | Job status, cancellation, file access, and saving source documents |

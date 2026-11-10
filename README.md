@@ -54,6 +54,7 @@ py -3.12 scripts/bootstrap.py --lucidshape-exe "C:\Program Files\LucidShape\BIN6
 | Codex | `codex.local.toml` |
 | OpenCode | `opencode.local.json` |
 | 其他客户端 | 见 [全部 14 种配置](docs/harness-compatibility.md#客户端与配置文件) |
+| DeepSeek Harness（DSH） | 不生成文件，需装配置型组合包；见 [DSH 接入](docs/dsh.md) |
 
 配置使用本机解释器和绝对路径。换电脑或移动项目目录后，重新生成配置。
 
@@ -167,6 +168,7 @@ local-data\venv\Scripts\python.exe -m lucidshape_mcp check
 | --- | --- |
 | [安装指南](docs/installation.md) | 安装、升级、环境诊断和常见问题 |
 | [客户端兼容](docs/harness-compatibility.md) | 各客户端配置格式及接入位置 |
+| [DSH 接入](docs/dsh.md) | DeepSeek Harness 的组合包接入、字段对应与低完整性级别陷阱 |
 | [工具目录](docs/tools.md) | 工具用途、参数和执行边界 |
 | [场景配置与迁移](docs/generalization.md) | 材料、光源、分区、工况和旧接口迁移 |
 | [任务与权限](docs/operations.md) | 任务状态、取消、文件访问和源文档保存 |

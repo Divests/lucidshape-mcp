@@ -28,6 +28,8 @@ py -3.12 scripts/bootstrap.py --lucidshape-exe "C:\Program Files\LucidShape\BIN6
 
 按 [Harness 兼容说明](harness-compatibility.md) 选择对应配置。通用 JSON 为 `mcp.local.json`，Codex 为 `codex.local.toml`；VS Code、OpenCode 等必须使用其专用输出。将服务器条目合并到客户端已有配置中，避免重复定义同名条目。生成器不会覆盖已有的客户端配置。
 
+DeepSeek Harness（DSH）不读取这些文件，需要把 `mcp.local.json` 里的启动字段搬进一个配置型组合包，并且虚拟环境要装在 DSH 工作区之外；步骤见 [DSH 接入](dsh.md)。
+
 Codex 的 stdio 配置使用 `command`、`args` 和 `env`；生成的 TOML 格式依据 [OpenAI 官方 MCP 文档](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)。客户端重连后，默认应能发现 37 个工具（启用实验组后为 46 个，`all` 包含旧别名共 54 个）。
 
 生成文件使用本机解释器和绝对路径，只留在 `local-data`，不上传 Git。换电脑只传源码，重新安装；目录改名后重新运行安装/配置命令，不把旧虚拟环境和配置当作可移植安装包。
