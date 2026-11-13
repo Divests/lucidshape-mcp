@@ -1,0 +1,121 @@
+#pragma NOPP
+object srNull;
+string srDirectory;
+string srPath(string name){string result;result<<srDirectory<<"/"<<name;return result;}
+void srProgress(string step){
+    object status=JSONStore(srPath("native-progress.json"),0,1);
+    status<<step;status=srNull;
+}
+object srGrid(object data,string name){
+    double u0,u1,v0,v1,lo,hi,pu,pv,u,v,w,t;
+    data.range(u0,u1,v0,v1,lo,hi);
+    double peak=data.maxValue(pu,pv);
+    string fn; fn << name << ".csv";
+    object grid=OStream("MCP native static road grid",srPath(fn));grid.precision(17);
+    grid << "u_index,v_index,u,v,value" << endl;
+    for(double j=0;j<data.sizeV();j++)for(double i=0;i<data.sizeU();i++){
+        data.positionOf(i,j,0,0,u,v,w,t);
+        grid << i << "," << j << "," << u << "," << v << "," << data.value(i,j) << endl;
+    }
+    grid=srNull;
+    return (data.sizeU(),data.sizeV(),data.dataType(),data.angleType(),data.isInLux(),(u0,u1,v0,v1),(peak,pu,pv));
+}
+object srLine(string name,object color,double x0,double x1,double y0,double y1){
+    return MeshSurface(name,color,((x0,y0,0.001),(x1,y0,0.001),(x1,y1,0.001),(x0,y1,0.001)),(),(),((0,1,2,3)),0);
+}
+object srCamera(object view,object graphic,object eye,double target,string name){
+    object cam=graphic.getCamera();
+    cam.setViewPos(eye);
+    cam.setViewDir((1,0,-eye[2]/target));
+    cam.setUpDir((0,0,1));
+    cam.setProjectionType("Perspective");
+    cam.setFieldOfViewY(40,cam.getNear(),cam.getFar());
+    graphic.update();
+    object bitmap=view.snapshotBitmap();
+    string file;file<<name<<".png";
+    bitmap.saveBMPFile(srPath(file));
+    object vp=cam.getViewPos(),vd=cam.getViewDir(),vu=cam.getUpDir();
+    return (eye,target,(vp[0],vp[1],vp[2]),(vd[0],vd[1],vd[2]),cam.getFOVYAngle(),(vu[0],vu[1],vu[2]),cam.getProjectionType());
+}
+void main(){
+    srDirectory=@@DIRECTORY@@;
+    srProgress("entered_main");
+    object app=getApplication();
+    object initialModels=app.getAllModels();
+    if(app.isRunningSimulation())return;
+    object input;
+    if(@@IS_IES@@) input=IESData("Static Road input",srPath(@@INPUT@@));
+    else {
+        object group=ObjectVector("photometry input",());
+        group.readFileIntoGroup(srPath(@@INPUT@@),$,1);
+        object found=group.getObjects("UVData");
+        if(found.size()!=1)return;
+        input=found[0];
+    }
+    if(!input || !input.isInCandela() || input.isSpectral() || input.sizeW()!=1 || input.sizeT()!=1 || input.angleType()>1)return;
+    srProgress("input_loaded");
+    object emi=LIDEmitter("two identical module patterns",input,$);
+    object left=PointLight("left lamp",AxisSystem("left axis",$,@@P0@@,(1,0,0),(0,1,0),0),emi);
+    object right=PointLight("right lamp",AxisSystem("right axis",$,@@P1@@,(1,0,0),(0,1,0),0),emi);
+    object road=LIDData("radial lux on road",List(),3,1,1,(-1,1,-1,1),1.,$);
+    object back=LIDData("radial lux on back wall",List(),3,1,1,(-1,1,-1,1),1.,$);
+    object roadSensor=SurfaceShape("radial lux sensor on road",
+        PlanarSurface("road sensor plane",(0.96,0.96,0.94),AxisSystem("",$,(0,0,0),(0,0,1),(1,0,0),0),@@BOUNDS@@),
+        LuxSensor("radial lux on road",1,1,@@CELL@@,1,1,road));
+    object backSensor=SurfaceShape("radial lux sensor on back wall",
+        PlanarSurface("back wall",(0,1,1),AxisSystem("",$,(@@BACK_X@@,0,0),(-1,0,0),(0,-1,0),0),@@BACK_BOUNDS@@),
+        LuxSensor("radial lux on back wall",1,1,0.5,1,1,back));
+    object lines=ObjectVector("native lane lines",());
+    lines << srLine("left white",(1,1,1),@@X0@@,@@X1@@,-@@WIDTH@@-.075,-@@WIDTH@@+.075);
+    lines << srLine("right white",(1,1,1),@@X0@@,@@X1@@,@@WIDTH@@-.075,@@WIDTH@@+.075);
+    for(double x=@@X0@@;x<@@X1@@;x=x+9){
+        lines << srLine("yellow center dashed",(1,1,0),x,min(x+3,@@X1@@),-.075,.075);
+    }
+    string sceneName;sceneName<<"MCP Static Road scene "<<@@NONCE@@;
+    object scene=ObjectVector(sceneName,(left,right,roadSensor,backSensor,lines));
+    srProgress("scene_constructed");
+    object model=app.newModel();
+    model << scene;
+    object view=app.createGeo3DModelView(model);
+    view.setWindowSize(1600,900);
+    object graphic=view.getGraphic();
+    graphic.setSurfaceDisplayType(6);
+    graphic.setSurfaceProperties(1,$,$,1,2,$,1,$,$);
+    graphic.setStockSceneType(0);
+    view.setBackgroundColor(30./255,30./255,40./255);
+    srProgress("native_view_created");
+    object tracer=ForwardRayTrace("Static Road native gather",0.1,256,1,scene);
+    tracer.gatherSensorLight(0,0,0);
+    model.updateValueRange();
+    model.update(2,0);
+    srProgress("light_gathered");
+    object roadMeta=srGrid(road,"road");
+    object backMeta=srGrid(back,"back-wall");
+    object out=Store(srPath("road.lid"));out<<road;out=srNull;
+    out=Store(srPath("back-wall.lid"));out<<back;out=srNull;
+    out=Store(srPath("scene.lue"));out<<scene;out=srNull;
+    road.saveUVAsBMP(srPath("road-map.png"),1,2,0,0);
+    srProgress("native_data_saved");
+    object driver=srCamera(view,graphic,@@DRIVER@@,@@DRIVER_TARGET@@,"driver");
+    object top=srCamera(view,graphic,@@TOP@@,@@TOP_TARGET@@,"top20");
+    srProgress("native_views_saved");
+    model.setDirty(0);
+    object remainingModelList=app.getAllModels();
+    double remainingModels=remainingModelList.size();
+    double preserved=1;
+    for(double oldIndex=0;oldIndex<initialModels.size();oldIndex++){
+        object prior=initialModels[oldIndex];double matched=0;
+        for(double newIndex=0;newIndex<remainingModelList.size();newIndex++){
+            object current=remainingModelList[newIndex];
+            if(prior.isSameObject(current))matched=1;
+        }
+        if(!matched)preserved=0;
+    }
+    srProgress("native_views_retained");
+    double pu,pv,peak=input.maxValue(pu,pv);
+    out=JSONStore(srPath("native-result.json"),0,1);
+    out<<(1,@@NONCE@@,(input.angleType(),input.sizeU(),input.sizeV(),input.integral(),peak),roadMeta,backMeta,driver,top,remainingModels,initialModels.size(),preserved,model.getName(),view.getName());
+    out=srNull;
+    cout<<"LUCIDSHAPE_STATIC_ROAD_OK"<<endl;
+}
+

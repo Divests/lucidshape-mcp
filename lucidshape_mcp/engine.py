@@ -108,6 +108,12 @@ class BatchEngine(JobControl):
                 "verified_engine_sha256": road_simulation.VERIFIED_ENGINE,
                 "live_studio_changed": False,
             },
+            "native_report_views": {
+                "tools": ["studio_export_photometry_view", "studio_generate_static_road_views"],
+                "backend": "Task-owned LucidStudio process and fixed native API scripts",
+                "source_files_changed": False, "uses_computer_input": False,
+                "verification": "Native receipts and rendered artifact checks; availability must be checked by an actual export",
+            },
             "simulation_sensor_types": ["CandelaSensor", "LuxSensor", "LumenSensor", "Cdm2Sensor"],
             "live_studio_session": True,
             "live_studio": {"backend":"native Windows DDE and Studio Application API",

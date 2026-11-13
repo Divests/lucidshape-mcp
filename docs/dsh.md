@@ -17,7 +17,7 @@ $py = "C:\lucidshape-mcp\venv\Scripts\python.exe"
 & $py -m lucidshape_mcp check
 ```
 
-最后一条应输出 `"status": "passed"` 和 38 个工具。
+最后一条应输出 `"status": "passed"` 和 40 个工具。
 
 在 DSH 会话里执行 `scripts/bootstrap.py` 或 pip 时，DSH 的文件沙箱会影响安装：pip 写 HTTP 缓存时可能长时间空转（CPU 在涨、没有网络连接、没有输出），临时目录也可能不可写并报 `Permission denied ...\Temp\...\pip-unpack-*`。两种情况都用 `--no-cache-dir` 规避，必要时把 `$env:TEMP`/`$env:TMP` 指到可写目录；仍然不行就换到普通 PowerShell 窗口。
 
@@ -120,7 +120,7 @@ target: <组合包目录的绝对路径>
 
 ## 5. 工具组
 
-默认工具组含 `geometry`，其依赖 `cadquery-ocp-novtk` 需要单独安装；未安装时那几个工具仍会注册，调用时才报错。不需要就在 `LUCIDSHAPE_TOOLSETS` 里去掉 `geometry`（此时工具数为 34 而不是 38）。
+默认工具组含 `geometry`，其依赖 `cadquery-ocp-novtk` 需要单独安装；未安装时那几个工具仍会注册，调用时才报错。不需要就在 `LUCIDSHAPE_TOOLSETS` 里去掉 `geometry`（此时工具数为 36 而不是 40）。
 
 ## 6. 运行约束
 

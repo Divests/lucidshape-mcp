@@ -30,7 +30,7 @@ def main():
         raise SystemExit('Use a directory with exactly one wheel and one sdist')
     expected = {
         p.relative_to(ROOT).as_posix()
-        for p in (ROOT / 'lucidshape_mcp').rglob('*') if p.suffix in {'.py', '.do'}
+        for p in (ROOT / 'lucidshape_mcp').rglob('*') if p.suffix in {'.py', '.do', '.lus'}
     }
     with zipfile.ZipFile(wheels[0]) as z:
         names = z.namelist()

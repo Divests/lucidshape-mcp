@@ -29,4 +29,4 @@ include = ["lucidshape_mcp*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-lucidshape_mcp = ["templates/*.do"]
+lucidshape_mcp = ["templates/*.do", "templates/*.lus"]

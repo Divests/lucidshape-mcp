@@ -1,0 +1,19 @@
+#pragma NOPP
+void main(){
+object n;object progress=OStream("UV export progress",@@PROGRESS@@);progress<<"entered main"<<endl;object app=getApplication();object data;
+if(@@IS_IES@@) data=IESData("MCP native photometry",@@SOURCE@@);
+else {object group=ObjectVector("MCP input",());group.readFileIntoGroup(@@SOURCE@@,$,1);object found=group.getObjects("UVData");if(found.size()==1)data=found[0];}
+progress<<"loaded input"<<endl;
+if(!data || (@@REQUIRE_CD@@ && !data.isInCandela()) || (data.isInCandela() && data.angleType()>1) || data.isSpectral() || data.sizeW()!=1 || data.sizeT()!=1) return;
+progress<<"validated input"<<endl;object view=app.createUVDataModelView(data);progress<<"created view"<<endl;if(!view)return;
+view.setWindowSize(@@WIDTH@@,@@HEIGHT@@);
+object props=view.getProperties();
+props[7]=2;props[9]=0;props[10]=0;props[11]=0;props[12]=1;props[16]=1;props[17]=1;props[19]=1;props[20]=1;
+@@MODS@@
+view.setProperties(props);progress<<"applied properties"<<endl;
+object bitmap=view.snapshotBitmap();bitmap.saveBMPFile(@@PNG@@);
+progress<<"saved bitmap"<<endl;double w,h,pu,pv;view.getWindowSize(w,h);double maximum=data.maxValue(pu,pv);
+object out=JSONStore(@@RECEIPT@@,0,1);
+out<<(@@NONCE@@,1,"succeeded",view.nameOfClass(),(w,h),(maximum,pu,pv),data.integral(),view.getProperties(),data.isInCandela(),data.angleType(),"completed");out=n;
+progress=n;
+}

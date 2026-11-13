@@ -15,7 +15,7 @@
 | `repair_s9_main_lens_mesh` | `repair_optical_mesh` |
 | `prepare_inner_lens_regions` | `prepare_optical_regions` |
 
-新入口将 `requirements_path` 改为 `scene_path`，`rays_per_led` 改为 `rays_per_source`，`pc_normal_policy` 改为 `normal_policy`。旧工具别名仍接受旧参数名，启用 `legacy` 组或 `--toolsets all` 后可见；新实验功能在 `experimental` 组。默认 38 个工具，启用实验组为 47 个，加上 8 个旧别名共 55 个。
+新入口将 `requirements_path` 改为 `scene_path`，`rays_per_led` 改为 `rays_per_source`，`pc_normal_policy` 改为 `normal_policy`。旧工具别名仍接受旧参数名，启用 `legacy` 组或 `--toolsets all` 后可见；新实验功能在 `experimental` 组。默认 40 个工具，启用实验组为 49 个，加上 8 个旧别名共 57 个。
 
 核心实现为 `optical_scene.py`、`scene_utils.py`、`gpu_trace.py`，原生模板采用 `*_optical_*` 名称。`s9_scene.py` 和 `gpu_s9.py` 仅为旧 Python 导入保留转发；旧工程校验和默认值集中在 `legacy_profile.py`。旧任务类型可继续读取，结果中的 `rays_per_led`、`PC_*` 等历史字段按兼容约定保留，新场景增加通用材料、光源和工况字段。
 

@@ -1,5 +1,5 @@
 include README.md README.en.md pyproject.toml
-recursive-include lucidshape_mcp *.py *.do
+recursive-include lucidshape_mcp *.py *.do *.lus
 recursive-include docs *.md
 include examples/mcp.example.json
 include examples/optical-scene.example.json examples/region-manifest.example.json

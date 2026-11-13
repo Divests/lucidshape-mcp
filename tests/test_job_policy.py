@@ -202,14 +202,14 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, DEFAULT_ENV):
             engine = BatchEngine(Path(d))
             default = await create_server(engine).list_tools()
-            self.assertEqual(len(default), 38)
+            self.assertEqual(len(default), 40)
             self.assertNotIn('trace_s9_gpu_control', {t.name for t in default})
             with patch.dict(os.environ, {'LUCIDSHAPE_TOOLSETS': 'all'}):
                 engine.policy = Policy.from_env(engine.root)
                 server = create_server(engine)
                 all_tools = await server.list_tools()
                 self.assertEqual({t.name for t in all_tools}, ALL_TOOLS)
-                self.assertEqual(len(all_tools), 55)
+                self.assertEqual(len(all_tools), 57)
                 for tool in all_tools:
                     self.assertIsNotNone(tool.outputSchema, tool.name)
                     self.assertIsNotNone(tool.annotations, tool.name)

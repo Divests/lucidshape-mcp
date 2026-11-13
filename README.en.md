@@ -133,15 +133,15 @@ Installation, `configure`, and `serve` also support `--toolsets`, `--tools`, `--
 
 ## Tools and workflows
 
-Version **0.8.0** exposes **38 tools** by default, or **47** with `experimental` enabled. The `all` selection adds 8 legacy aliases, for a total of **55**. The client's `tools/list` response is the authoritative source for tool parameters and return schemas.
+Version **0.8.0** exposes **40 tools** by default, or **49** with `experimental` enabled. The `all` selection adds 8 legacy aliases, for a total of **57**. The client's `tools/list` response is the authoritative source for tool parameters and return schemas.
 
 | Task | Common tools |
 | --- | --- |
 | Inspect and export CAD | `catia_inspect_part`, `catia_export_step`, `inspect_cad_geometry` |
 | Connect to an existing LucidStudio session | `studio_get_live_state`, `studio_inspect_current`, `studio_import_step` |
 | Process saved models | `inspect_model`, `simulate_model`, `run_parameter_sweep` |
-| Analyze and export light distributions | `analyze_lid`, `compare_photometry`, `export_ies` |
-| Generate native road and driver views | `generate_road_views` |
+| Analyze and export light distributions | `analyze_lid`, `compare_photometry`, `export_ies`, `studio_export_photometry_view` |
+| Generate native road and driver views | `generate_road_views`, `studio_generate_static_road_views` |
 | Manage jobs | `get_job`, `list_jobs`, `cancel_job`, `read_job_log` |
 
 For example, generate a light distribution file from a model with its light sources, materials, and sensors already configured:

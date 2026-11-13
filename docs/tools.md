@@ -1,6 +1,6 @@
 # MCP 工具目录
 
-当前服务默认开放 38 个工具，启用 `experimental` 后共 47 个规范工具；另启用 `legacy` 的 8 个旧别名后共 55 个。客户端 `tools/list` 返回的 schema 为调用依据；分组、只读、文件权限和升级行为见 [任务和权限](operations.md)。
+当前服务默认开放 40 个工具，启用 `experimental` 后共 49 个规范工具；另启用 `legacy` 的 8 个旧别名后共 57 个。客户端 `tools/list` 返回的 schema 为调用依据；分组、只读、文件权限和升级行为见 [任务和权限](operations.md)。
 
 ## 返回方式
 
@@ -53,6 +53,8 @@
 | `run_parameter_sweep` | 对同一保存模型运行 1–16 组独立 CPU 参数试验，固定随机种子，每组输出 LID 和汇总 CSV |
 | `export_ies` | 用原生接口将二维非光谱坎德拉 LID 导出为 IES，回读并逐格核对光强、角度和网格，再独立检查文件结构；不执行仿真或法规判定 |
 | `generate_road_views` | 从已瞄准的坎德拉配光生成原生道路照度与驾驶员视角亮度；显式灯位、眼点、网格和路面反射率，原生 X前/Y左/Z上、单位米；不重追迹 CAD、不改当前 Studio |
+| `studio_export_photometry_view` | 将 IES/LID 副本作为原生 UVView 导出 PNG，保留坐标、色标、网格和等值线；不经过屏幕截图或剪贴板，不隐式转换光度量 |
+| `studio_generate_static_road_views` | 由两盏灯的已瞄准配光生成原生 Static Road 场景、径向照度 LID/CSV、驾驶员及高位视角 PNG；使用 LightData 显示，不表示 cd/m² 亮度 |
 | `get_job` | 查询状态、输入文件清单、结构化 result 和已验证的产物路径 |
 | `list_jobs` | 按状态筛选并分页列出任务、阶段、耗时和所属实例 |
 | `cancel_job` | 向已验证的所属实例请求取消任务，只停止它拥有的工作进程；需轮询确认终态 |
@@ -75,3 +77,24 @@
 坐标使用 **X 向前、Y 向左、Z 向上，长度为米**。`road_bounds_m` 为 `[前方最小值, 前方最大值, 左向最小值, 左向最大值]`；`view_bounds_deg` 为 `[水平最小角, 水平最大角, 垂直最小角, 垂直最大角]`，`view_angles_deg` 为原生 `[旋转, 俯仰, 滚转]`。当前验证配置不接受非零旋转或滚转。灯具方向固定朝前，因此输入配光应已经完成所需瞄准；工具不再添加下倾或光通量倍率。
 
 路面采用明确 `road_reflectance` 的理想朗伯模型。该工作流调用 LucidShape 的道路/亮度原生接口，返回原生 LID、图像及校验记录，实际文件以 `get_job.artifacts` 为准。它是配光到道路的投影，不重新追迹整灯 CAD，不包含车身遮挡，也不给出法规合格结论。原生输出不应与未标定曝光的真实人眼照片等同。
+
+
+## 原生报告图片
+
+`studio_export_photometry_view` 和 `studio_generate_static_road_views` 属于 `analysis` 组，返回直接回执。两者创建派生文件及原生视图，所以不在 `read_only` 模式开放。工具仅接受已验证的 Studio 二进制版本，固定脚本、输入快照和结果校验均写入任务目录。本版使用任务独占的 Studio 进程和固定启动脚本，调用前请保存并关闭其他 LucidShape 窗口，工具不会替你关闭已有实例。导出验证完成后只结束任务自己启动的进程。当前不通过已有窗口的 DDE 连接执行这两个新增工具。结果须为 `status: succeeded` 才能作为完成的原生导出使用；超时后不要自动重复提交。
+
+### 配光图
+
+`studio_export_photometry_view` 使用 `UVView.snapshotBitmap` 导出带原生坐标及色标的 PNG。`width_px`、`height_px` 指定导出尺寸，`view_bounds` 指定显示范围，`value_range` 为对数色标范围，`contours` 指定等值线。IES 的坐标单位为角度，平面 LID 使用数据自身的坐标单位。
+
+`quantity: candela` 要求坎德拉输入，`quantity: native` 保留原生量纲。工具不把光强转换为 25 m 屏照度。报告应依据实际数据标注 cd、lx 等单位，避免将颜色相似的图混为同一物理量。
+
+### Static Road 图
+
+`studio_generate_static_road_views` 要求两个显式灯位 `lamp_positions_m`，同一份二维非光谱 Type A/B 配光用于两灯。输入已包含的下倾和光通量倍率不会再次叠加。长度使用米，X 向前、Y 向左、Z 向上，道路在 Z=0。
+
+`road_bounds_m` 为 `[Xmin, Xmax, Ymin, Ymax]`，`road_cell_size_m` 为道路网格间距。`driver_position_m` 和 `top_position_m` 为相机位置，`driver_target_m` 和 `top_target_m` 使用原生前向目标距离约定。场景包含车道标线及道路末端背景墙。
+
+当前模式为 `illumination_type: radial`，不乘水平路面入射余弦。它与 `generate_road_views` 的水平路面照度及朗伯亮度模式有不同含义。Static Road 的驾驶员和高位图片使用原生 LightData/Munsell 灰度显示，不能标注为 cd/m² 或经过视觉亮度标定的照片。输出的 `road.lid` 可继续交给配光图导出工具，生成带坐标与色标的原生道路图。
+
+这两种工作流都从已有配光计算结果，不重新追迹整灯几何，也不自动得出 GB、ECE 或 C-NCAP 结论。

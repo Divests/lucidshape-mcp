@@ -2,7 +2,7 @@
 
 ## 工具选择
 
-默认 38 个工具：`core,studio,catia,geometry,analysis,simulation`。`experimental` 包含 9 个通用场景实验工具，包括配置追迹、分区修复及 GPU 对照；显式启用后共 47 个规范工具。`legacy` 包含 8 个旧名称兼容入口，`--toolsets all` 共开放 55 个。指定实体 STL 导出已归入 CATIA 组，必须显式传实体名称。0.8 的名称/参数/场景迁移见 [通用化说明](generalization.md)。
+默认 40 个工具：`core,studio,catia,geometry,analysis,simulation`。`experimental` 包含 9 个通用场景实验工具，包括配置追迹、分区修复及 GPU 对照；显式启用后共 49 个规范工具。`legacy` 包含 8 个旧名称兼容入口，`--toolsets all` 共开放 57 个。指定实体 STL 导出已归入 CATIA 组，必须显式传实体名称。0.8 的名称/参数/场景迁移见 [通用化说明](generalization.md)。
 
 安装时可以指定：
 

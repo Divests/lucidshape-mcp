@@ -42,7 +42,7 @@ def allowed_path(name: str) -> bool:
     if '.local.' in p.name or p.suffix.lower() in PRIVATE_SUFFIXES:
         return False
     return (
-        (p.parts[0] == 'lucidshape_mcp' and p.suffix in {'.py', '.do'})
+        (p.parts[0] == 'lucidshape_mcp' and p.suffix in {'.py', '.do', '.lus'})
         or (p.parts[0] == 'tests' and p.suffix == '.py')
         or (p.parts[0] == 'docs' and p.suffix == '.md')
         or name in {'examples/mcp.example.json', 'examples/optical-scene.example.json', 'examples/region-manifest.example.json'}

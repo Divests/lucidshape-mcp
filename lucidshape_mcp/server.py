@@ -11,6 +11,8 @@ from .live_studio import live_state,inspect_current,import_step
 from .dde_session import DDESession
 from .tool_api import registrar
 from .studio_queries import get_api_catalog, inspect_objects, get_simulation_settings
+from .uv_view_export import export_view as export_photometry_view
+from .static_road_export import generate_views as generate_static_road_views
 from .config import executable_path, work_directory
 
 
@@ -97,6 +99,39 @@ def create_server(engine: BatchEngine) -> FastMCP:
         """Import a STEP snapshot as a new document in an EXISTING LucidStudio instance via native DDE/API. Never launches/closes Studio or edits an existing model; no computer-use or GUI input. Verifies PID, nonce, requested model identity, geometry, source hash and two later API roundtrips. Adds no optics and does not simulate. Returns result directly; only status=succeeded means verified within the stated observation period, not future stability. Unverified/timeouts may still be executing: do not automatically resubmit."""
         async with engine.native_session():
             return await import_step(engine.root,cad_path,process_id,timeout_seconds,observe_seconds,live_session.request)
+
+    @tool()
+    async def studio_export_photometry_view(lid_path: str, width_px: int = 1600,
+            height_px: int = 900, quantity: str = "candela",
+            view_bounds: list[float] | None = None, value_range: list[float] | None = None,
+            contours: list[float] | None = None, timeout_seconds: int = 120) -> dict:
+        """Export a native photometry view from a private IES/LID snapshot using a task-owned Studio process. Close other Studio instances before calling; this verified profile requires exclusive startup. Uses native view rendering, not screen capture or mouse/keyboard input. Original data and existing Studio documents are preserved. Only status=succeeded with image and native receipt confirms export; unavailable/unverified is not success. Does not retrace CAD geometry or certify compliance."""
+        if not engine.command:
+            raise ValueError("Configure LUCIDSHAPE_EXE first")
+        async with engine.native_session():
+            return await export_photometry_view(engine.root, Path(engine.command[0]).parent / "LucidShape.exe",
+                lid_path=lid_path, width_px=width_px, height_px=height_px, quantity=quantity,
+                view_bounds=view_bounds, value_range=value_range,
+                contours=contours, timeout_seconds=timeout_seconds)
+
+    @tool()
+    async def studio_generate_static_road_views(lid_path: str, lamp_positions_m: list[list[float]],
+            road_bounds_m: list[float], road_cell_size_m: float = 0.25,
+            driver_position_m: list[float] | None = None, driver_target_m: float = 20,
+            top_position_m: list[float] | None = None, top_target_m: float = 50,
+            lane_width_m: float = 3.6, illumination_type: str = "radial", timeout_seconds: int = 180) -> dict:
+        """Generate native Static Road-style road, driver and elevated views in a task-owned Studio process from saved, already-aimed candela photometry. Uses radial road illuminance and native LightData scene display with lane markings and back wall; this is not a cd/m2 luminance image. Same IES for each lamp, no extra pitch/scale/mirror. X forward, Y left, Z up in metres, road z=0. Close other Studio instances before calling; this verified profile requires exclusive startup. Source files are preserved. Returns verified artifacts only after native receipts; no CAD retracing or regulatory scoring."""
+        if not engine.command:
+            raise ValueError("Configure LUCIDSHAPE_EXE first")
+        async with engine.native_session():
+            return await generate_static_road_views(engine.root, Path(engine.command[0]).parent / "LucidShape.exe",
+                lid_path=lid_path, lamp_positions_m=lamp_positions_m, road_bounds_m=road_bounds_m,
+                road_cell_size_m=road_cell_size_m,
+                driver_position_m=[0, 0, 1.2] if driver_position_m is None else driver_position_m,
+                driver_target_m=driver_target_m,
+                top_position_m=[-25, 0, 20] if top_position_m is None else top_position_m,
+                top_target_m=top_target_m, lane_width_m=lane_width_m,
+                illumination_type=illumination_type, timeout_seconds=timeout_seconds)
 
     @tool()
     async def catia_get_state(timeout_seconds: int = 30) -> dict:
