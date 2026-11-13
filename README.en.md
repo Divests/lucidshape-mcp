@@ -144,6 +144,8 @@ Version **0.8.0** exposes **40 tools** by default, or **49** with `experimental`
 | Generate native road and driver views | `generate_road_views`, `studio_generate_static_road_views` |
 | Manage jobs | `get_job`, `list_jobs`, `cancel_job`, `read_job_log` |
 
+Native report image exports check for existing Studio processes first. If a window is open, save and close it once without manually reopening. Timeouts and validation failures clean up only the task-owned process and retain diagnostic logs. An update-check Internet warning is distinct from an MCP connection failure; see the [operations guide](docs/operations.md#原生报告导出).
+
 For example, generate a light distribution file from a model with its light sources, materials, and sensors already configured:
 
 ```text

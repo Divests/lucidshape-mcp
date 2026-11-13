@@ -125,6 +125,44 @@ class NativeUVExportTests(unittest.TestCase):
         self.assertNotIn('image',result)
         close.assert_not_called()
 
+    def test_receipt_with_invalid_artifacts_still_closes_owned_process(self):
+        executable=self.root/'LucidShape.exe'
+        executable.write_bytes(b'test engine')
+        launch={'status':'receipt_ready','launcher_pid':4242,'private_process_started':True,'process_left_open':True}
+        with patch.object(uv,'STUDIO_SHA256',hashlib.sha256(executable.read_bytes()).hexdigest()), \
+             patch.object(uv,'make_script',return_value='void main(){}'), \
+             patch.object(uv,'run_private_studio',AsyncMock(return_value=launch)), \
+             patch.object(uv,'finalize',side_effect=ValueError('native image CRC mismatch')), \
+             patch.object(uv,'close_private_studio',AsyncMock(return_value={'closed':True})) as close:
+            result=asyncio.run(uv.export_view(self.root/'jobs',executable,lid_path=str(self.source),width_px=400,height_px=250))
+        self.assertEqual(result['status'],'unverified')
+        self.assertEqual(result['error_details']['code'],'NATIVE_ARTIFACT_VALIDATION_FAILED')
+        self.assertFalse(result['process_left_open'])
+        self.assertNotIn('image',result)
+        close.assert_awaited_once_with(launch)
+        recorded=json.loads((Path(result['record_directory'])/'result.json').read_text(encoding='utf-8'))
+        self.assertEqual(recorded['status'],'unverified')
+        self.assertTrue(recorded['private_process_cleanup']['closed'])
+
+    def test_unavailable_preflight_status_preserved_without_wrapper_cleanup(self):
+        executable=self.root/'LucidShape.exe'
+        executable.write_bytes(b'test engine')
+        launch={'status':'unavailable','error_details':{'code':'STUDIO_ALREADY_RUNNING'},
+                'private_process_started':False,'process_left_open':False}
+        with patch.object(uv,'STUDIO_SHA256',hashlib.sha256(executable.read_bytes()).hexdigest()), \
+             patch.object(uv,'make_script',return_value='void main(){}'), \
+             patch.object(uv,'run_private_studio',AsyncMock(return_value=launch)), \
+             patch.object(uv,'finalize') as finalize, \
+             patch.object(uv,'close_private_studio',AsyncMock()) as close:
+            result=asyncio.run(uv.export_view(self.root/'jobs',executable,lid_path=str(self.source),width_px=400,height_px=250))
+        self.assertEqual(result['status'],'unavailable')
+        self.assertEqual(result['error_details']['code'],'STUDIO_ALREADY_RUNNING')
+        self.assertFalse(result['process_left_open'])
+        finalize.assert_not_called()
+        close.assert_not_called()
+        recorded=json.loads((Path(result['record_directory'])/'result.json').read_text(encoding='utf-8'))
+        self.assertEqual(recorded['status'],'unavailable')
+
 class PrivateExportPolicyTests(unittest.TestCase):
     def test_existing_pid_refused_before_any_launch(self):
         with patch.object(uv,'run_private_studio',AsyncMock()) as launch:

@@ -1,10 +1,15 @@
+import asyncio
 import csv
+import hashlib
 import json
 import shutil
 import struct
 import zlib
 import tempfile
 import unittest
+from unittest.mock import AsyncMock, patch
+from lucidshape_mcp import static_road_export as road
+from lucidshape_mcp import private_studio as studio
 from pathlib import Path
 from lucidshape_mcp.static_road_export import validate, verify_csv, verify_camera, stage_static_road, finalize_static_road, generate_views, _png
 
@@ -119,6 +124,43 @@ class StaticRoadValidationTests(unittest.TestCase):
             stream.write("\n// altered after launch\n")
         with self.assertRaisesRegex(ValueError, "Native job script changed"):
             finalize_static_road(directory, p)
+
+
+    def test_invalid_artifact_receipt_closes_owned_process_and_records_failure(self):
+        executable=self.directory/'LucidShape.exe'
+        executable.write_bytes(b'test engine')
+        launch={'status':'receipt_ready','launcher_pid':4242,'private_process_started':True,'process_left_open':True}
+        with patch.object(road,'STUDIO_SHA256',hashlib.sha256(executable.read_bytes()).hexdigest()), \
+             patch.object(studio,'run_private_studio',AsyncMock(return_value=launch)), \
+             patch.object(road,'finalize_static_road',side_effect=ValueError('camera mismatch')), \
+             patch.object(studio,'close_private_studio',AsyncMock(return_value={'closed':True})) as close:
+            result=asyncio.run(generate_views(self.directory/'jobs',executable,**self.args))
+        self.assertEqual(result['status'],'unverified')
+        self.assertEqual(result['error_details']['code'],'NATIVE_ARTIFACT_VALIDATION_FAILED')
+        self.assertFalse(result['process_left_open'])
+        self.assertFalse(result['created_scene_view_retained'])
+        close.assert_awaited_once_with(launch)
+        recorded=json.loads((Path(result['work_directory'])/'result.json').read_text(encoding='utf-8'))
+        self.assertEqual(recorded['status'],'unverified')
+        self.assertTrue(recorded['private_process_cleanup']['closed'])
+
+    def test_unavailable_preflight_preserved_without_validation_or_extra_cleanup(self):
+        executable=self.directory/'LucidShape.exe'
+        executable.write_bytes(b'test engine')
+        launch={'status':'unavailable','error_details':{'code':'STUDIO_ALREADY_RUNNING'},
+                'private_process_started':False,'process_left_open':False}
+        with patch.object(road,'STUDIO_SHA256',hashlib.sha256(executable.read_bytes()).hexdigest()), \
+             patch.object(studio,'run_private_studio',AsyncMock(return_value=launch)), \
+             patch.object(road,'finalize_static_road') as finalize, \
+             patch.object(studio,'close_private_studio',AsyncMock()) as close:
+            result=asyncio.run(generate_views(self.directory/'jobs',executable,**self.args))
+        self.assertEqual(result['status'],'unavailable')
+        self.assertEqual(result['error_details']['code'],'STUDIO_ALREADY_RUNNING')
+        self.assertFalse(result['process_left_open'])
+        finalize.assert_not_called()
+        close.assert_not_called()
+        recorded=json.loads((Path(result['work_directory'])/'result.json').read_text(encoding='utf-8'))
+        self.assertEqual(recorded['status'],'unavailable')
 
 
 if __name__ == "__main__":

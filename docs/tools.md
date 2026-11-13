@@ -81,7 +81,7 @@
 
 ## 原生报告图片
 
-`studio_export_photometry_view` 和 `studio_generate_static_road_views` 属于 `analysis` 组，返回直接回执。两者创建派生文件及原生视图，所以不在 `read_only` 模式开放。工具仅接受已验证的 Studio 二进制版本，固定脚本、输入快照和结果校验均写入任务目录。本版使用任务独占的 Studio 进程和固定启动脚本，调用前请保存并关闭其他 LucidShape 窗口，工具不会替你关闭已有实例。导出验证完成后只结束任务自己启动的进程。当前不通过已有窗口的 DDE 连接执行这两个新增工具。结果须为 `status: succeeded` 才能作为完成的原生导出使用；超时后不要自动重复提交。
+`studio_export_photometry_view` 和 `studio_generate_static_road_views` 属于 `analysis` 组，返回直接回执。两者创建派生文件及原生视图，所以不在 `read_only` 模式开放。工具仅接受已验证的 Studio 二进制版本，固定脚本、输入快照和结果校验均写入任务目录。本版使用任务独占的 Studio 进程和固定启动脚本。启动前先读取进程元数据；若已有 Studio，返回 `STUDIO_ALREADY_RUNNING` 且不启动新实例。此时只需保存并关闭已有窗口一次，无需手动重开；没有实例时由 MCP 启动。工具不会替你关闭已有实例，也不通过已有窗口的 DDE 连接执行。导出完成、超时、取消或产物校验失败后，只回收仍持有原始 Popen 句柄的任务进程，保留日志与产物；回收失败会明确返回 `process_left_open: true`。结果须为 `status: succeeded` 才能作为完成的原生导出使用；不要自动重复提交。预检查不能阻止检查后手工启动另一实例，运行期间应避免另行启动 Studio。故障阶段及操作建议见[运行说明](operations.md#原生报告导出)。
 
 ### 配光图
 

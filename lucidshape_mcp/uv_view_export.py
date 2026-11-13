@@ -125,16 +125,20 @@ async def export_view(root:Path,executable:Path,*,lid_path:str,width_px=1600,hei
     request={'parameters':parameters,'nonce':nonce,'engine_sha256':STUDIO_SHA256,'inputs':manifest,'script_sha256':script_sha256}
     (directory/'request.json').write_text(json.dumps(request,ensure_ascii=False,indent=2),encoding='utf-8')
     result={'status':'unverified','record_directory':str(directory),'inputs':manifest,'computer_use_calls':0,'automatic_resubmission_allowed':False}
+    launch=None
     try:
         launch=await run_private_studio(executable,directory,script,'native-receipt.json',timeout_seconds)
         result.update(launch)
-        if launch['status']!='receipt_ready':result['status']='unverified'
+        if launch['status']!='receipt_ready':result['status']=launch['status']
         else:
             result.update(finalize(directory,parameters,nonce,manifest,script_sha256))
-            result['private_process_cleanup']=await close_private_studio(launch)
-            result['process_left_open']=not result['private_process_cleanup']['closed']
     except Exception as exc:
         result.update(status='unverified',error=f'{type(exc).__name__}: {exc}')
+        result['error_details']={'code':'NATIVE_ARTIFACT_VALIDATION_FAILED','message':result['error'],'retryable':False}
+    finally:
+        if launch is not None and launch.get('status')=='receipt_ready':
+            result['private_process_cleanup']=await close_private_studio(launch)
+            result['process_left_open']=not result['private_process_cleanup']['closed']
     result['backend']='Private LucidStudio native UVView.snapshotBitmap / WindowsBitmap.saveBMPFile';result['read_only']=False
     (directory/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return result

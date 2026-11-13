@@ -144,6 +144,8 @@ local-data\venv\Scripts\python.exe -m lucidshape_mcp check
 | 生成原生路照与驾驶员视角 | `generate_road_views`、`studio_generate_static_road_views` |
 | 管理任务 | `get_job`、`list_jobs`、`cancel_job`、`read_job_log` |
 
+原生报告图片导出会先检查已有 Studio 进程；若已有窗口，只需保存并关闭一次，无需手动重开。超时或校验失败会回收本次任务自己的进程并保留诊断日志。更新检查联网弹窗与 MCP 连接故障应分别判断，详见[运行说明](docs/operations.md#原生报告导出)。
+
 例如，为已配置好光源、材料和传感器的模型生成配光文件：
 
 ```text

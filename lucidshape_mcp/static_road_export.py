@@ -310,29 +310,29 @@ async def generate_views(root: Path, executable: Path, *, process_id=None, trans
     directory = Path(root).resolve() / ("static-road-" + uuid.uuid4().hex)
     stage_static_road(directory, p)
     script = (directory / "job.lus").read_text(encoding="utf-8")
+    launched = None
+    result = {"status": "unverified", "work_directory": str(directory),
+              "automatic_resubmission_allowed": False, "computer_use_calls": 0}
     try:
         launched = await run_private_studio(executable, directory, script, "native-result.json", p["timeout_seconds"])
+        result["launch"] = launched
+        result["process_left_open"] = launched.get("process_left_open", False)
+        if launched.get("status") != "receipt_ready":
+            result["status"] = launched.get("status", "unverified")
+            result["error_details"] = launched.get("error_details")
+            result["message"] = launched.get("error", "Native Static Road job did not provide a complete verified receipt")
+            if "private_process_cleanup" in launched:
+                result["private_process_cleanup"] = launched["private_process_cleanup"]
+        else:
+            result.update(finalize_static_road(directory, p, launched))
     except Exception as error:
-        result = {"status": "unverified", "work_directory": str(directory), "process_id": process_id,
-                  "automatic_resubmission_allowed": False, "computer_use_calls": 0,
-                  "message": f"Native Static Road execution was not verified: {type(error).__name__}: {error}"}
-        (directory / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-        return result
-    if launched.get("status") != "receipt_ready":
-        return {"status": "unverified", "work_directory": str(directory), "launch": launched,
-                "automatic_resubmission_allowed": False,
-                "message": "Native Static Road job did not provide a complete verified receipt"}
-    try:
-        result = finalize_static_road(directory, p, launched)
-    except (ValueError, OSError, TypeError, KeyError, IndexError) as error:
-        return {"status": "unverified", "work_directory": str(directory), "launch": launched,
-                "automatic_resubmission_allowed": False, "message": f"Native artifact validation failed: {error}"}
-    result["work_directory"] = str(directory)
-    result["launch"] = launched
-    result["computer_use_calls"] = 0
-    result["private_process_cleanup"] = await close_private_studio(launched)
-    result["process_left_open"] = not result["private_process_cleanup"].get("closed", False)
-    result["created_scene_view_retained"] = result["process_left_open"]
-    (directory / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
+        result.update(status="unverified", message=f"Native Static Road export was not verified: {type(error).__name__}: {error}")
+        result["error_details"] = {"code": "NATIVE_ARTIFACT_VALIDATION_FAILED",
+                                   "message": result["message"], "retryable": False}
+    finally:
+        if launched is not None and launched.get("status") == "receipt_ready":
+            result["private_process_cleanup"] = await close_private_studio(launched)
+            result["process_left_open"] = not result["private_process_cleanup"].get("closed", False)
+        result["created_scene_view_retained"] = result.get("process_left_open", False)
+        (directory / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
     return result
-

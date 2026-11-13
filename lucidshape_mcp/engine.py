@@ -113,6 +113,8 @@ class BatchEngine(JobControl):
                 "backend": "Task-owned LucidStudio process and fixed native API scripts",
                 "source_files_changed": False, "uses_computer_input": False,
                 "verification": "Native receipts and rendered artifact checks; availability must be checked by an actual export",
+                "startup": "Process-metadata preflight; existing Studio is never closed or reconnected via DDE",
+                "failure_cleanup": "Only the retained task-owned Popen handle is closed; logs and artifacts are kept; no automatic retry",
             },
             "simulation_sensor_types": ["CandelaSensor", "LuxSensor", "LumenSensor", "Cdm2Sensor"],
             "live_studio_session": True,

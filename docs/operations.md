@@ -39,3 +39,20 @@ py -3.12 scripts/bootstrap.py --toolsets analysis,geometry --read-only --allow-r
 所有工具都有 `outputSchema` 和 `structuredContent`，保留原有顶层字段。公共结构版本为 `schema_version=1.0`。错误含 `error_details.code/message/retryable`，常见代码有 `ACCESS_DENIED`、`INVALID_ARGUMENT`、`FILE_NOT_FOUND`、`JOB_TIMEOUT`、`JOB_CANCELLED`、`OWNER_UNAVAILABLE`。同步工具错误设置 MCP `isError=true`；异步任务失败通过任务 `status` 表达。SDK 在执行前发现参数类型或范围错误时仍使用标准 MCP 工具错误。
 
 公共任务、日志、取消、分页和错误字段有类型约束；专项物理 `result` 和部分 Studio 回执仍按可扩展对象返回，并由原有结果校验器验证，尚未为每一种物理对象定义独立 schema。本版使用普通工具提交和轮询，未声明支持 MCP 原生 Tasks 协议、断点续算或通知式光线进度。
+
+## 原生报告导出
+
+`studio_export_photometry_view` 和 `studio_generate_static_road_views` 使用固定脚本启动私有 Studio，不需要先连接已有窗口，也不应在 DDE 连接失败后反复要求用户关闭、重开。正常流程为：检查已有进程 → MCP 启动 → 原生阶段回执 → 产物校验 → 回收任务进程。只读进程检查不操作界面，也不修改软件设置。
+
+| 返回代码 | 依据与处理 |
+| --- | --- |
+| `STUDIO_ALREADY_RUNNING` | 检查时发现已有实例，尚未启动导出。保存并关闭已有窗口一次，然后直接调用导出，无需手动重开。此代码不表示已有窗口损坏。 |
+| `STUDIO_PREFLIGHT_FAILED` | 无法读取进程清单，尚未启动导出。先解决进程读取权限或运行环境问题。 |
+| `STUDIO_STARTUP_UNCONFIRMED` | 超时且没有可读取的原生进度或完整回执。只表示启动/执行尚未确认；检查任务目录日志。不能据此判断为 DDE、许可证或网络故障。 |
+| `NATIVE_EXPORT_INCOMPLETE` | 已记录原生进度，但未收到完整回执。检查 `native_progress_tail` 与原生日志中的最后阶段。 |
+| `STUDIO_EXITED` / `STUDIO_LAUNCH_FAILED` | 导出进程提前退出或启动失败；读取退出码或系统错误。 |
+| `NATIVE_ARTIFACT_VALIDATION_FAILED` | 回执或产物未通过校验，不能当作成功导出。保留原始证据，不自动重跑。 |
+
+失败、取消和校验异常也会尝试回收本次私有导出进程，依据是原始 Popen 句柄，不根据进程名称或历史 PID 结束程序。若 MCP 服务被强制结束而丢失句柄，后续服务不会接管并终止遗留实例。回收状态记录在 `private_process_cleanup` / `process_left_open`，任务目录不会删除。
+
+若弹窗正文明确写着 **couldn't connect to the Internet to check for updates**，它表示 LucidShape 的更新检查联网失败，不等于 MCP 或仿真失败；弹窗可能阻塞启动脚本。按该提示，可在 General settings 关闭自动检查更新。工具目前不自动修改全局更新设置，也不自动点击弹窗；没有进度时只列出这种可能性，不声称已经检测到弹窗。若需要处理用户自己的窗口，应一次说明原因和步骤，不能让用户先重开再关闭。
