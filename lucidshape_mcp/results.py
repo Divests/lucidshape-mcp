@@ -574,5 +574,35 @@ def read_report(directory: Path, template: str, parameters: dict) -> tuple[dict,
                   "minimum_cd": minimum, "flux_in_data_domain_lm": number(integral)}
         if parameters["region_deg"] is not None:
             result["region"] = {"bounds_deg": parameters["region_deg"], "flux_lm": number(zone)}
+        # Older completed jobs and engines without the optional preview remain readable.
+        image = directory / "photometry-native.png"
+        if image.is_file():
+            from .uv_view_export import verify_png
+            import zlib
+
+            if image.resolve().parent != directory:
+                raise ValueError("Native analysis PNG escaped the job directory")
+            try:
+                verified = verify_png(image, count(sizes[0]), count(sizes[1]))
+            except zlib.error as error:
+                raise ValueError("Native analysis PNG pixel stream is invalid") from error
+            result["native_png_export"] = {
+                "path": str(image), **verified,
+                "method": "UVData.saveUVAsBMP",
+                "data_unit": "cd",
+                "value_mapping": "logarithmic",
+                "range_mode": "native_auto",
+                "native_color_type": 5,
+                "colormap": "native code 5; grayscale in the verified LS2.0 runtime",
+                "axes": False, "color_bar": False, "contours": False,
+                "angular_range_deg": result["angular_range_deg"].copy(),
+                "source_geometry_retraced": False,
+                "limitations": [
+                    "Native data bitmap only; axes, contours and color bar are not rendered.",
+                    "Automatic color ranges differ by input; compare numeric candela values, not image brightness.",
+                    "Display tones represent candela data, not emitted-light chromaticity or a calibrated photograph.",
+                ],
+            }
+            return result, [image.name]
         return result, []
     raise ValueError("Unknown report template")

@@ -133,12 +133,14 @@ local-data\venv\Scripts\python.exe -m lucidshape_mcp check
 
 ## 工具与使用流程
 
-当前版本 **0.8.0** 默认开放 **40 个工具**。启用 `experimental` 后为 **49 个**；`all` 另含 8 个旧别名，共 **57 个**。工具的参数和返回结构以客户端 `tools/list` 为准。
+当前版本 **0.8.0** 默认开放 **53 个工具**。启用 `experimental` 后为 **62 个**；`all` 另含 8 个旧别名，共 **70 个**。工具的参数和返回结构以客户端 `tools/list` 为准。
 
 | 任务 | 常用工具 |
 | --- | --- |
 | 检查与导出 CAD | `catia_inspect_part`、`catia_export_step`、`inspect_cad_geometry` |
 | 连接现有 LucidStudio | `studio_get_live_state`、`studio_inspect_current`、`studio_import_step` |
+| 按按钮名称查找操作 | `studio_list_ui_actions`、`studio_list_dialog_controls`、`studio_export_ui_catalog` |
+| 对 IES 均化、缩放或测点 | `photometry_apply_ui_action`、`measure_photometry_region` |
 | 计算已保存模型 | `inspect_model`、`simulate_model`、`run_parameter_sweep` |
 | 分析与导出配光 | `analyze_lid`、`compare_photometry`、`export_ies`、`studio_export_photometry_view` |
 | 生成原生路照与驾驶员视角 | `generate_road_views`、`studio_generate_static_road_views` |

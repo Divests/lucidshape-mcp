@@ -33,7 +33,7 @@ class NativeUVExportTests(unittest.TestCase):
         self.manifest=[{'source':str(self.source),'source_sha256':hashlib.sha256(self.source.read_bytes()).hexdigest(),'staged_name':'input.ies','staged_sha256':hashlib.sha256(self.source.read_bytes()).hexdigest()}]
         (self.root/'native-job.lus').write_bytes(b'void main(){}')
         self.script_hash=hashlib.sha256(b'void main(){}').hexdigest()
-        self.props=[0]*37
+        self.props=[0]*42
         self.props[0]=[0,100]
         self.props[2]=[-20,20,-10,10]
         for k,v in {7:2,9:0,11:0,12:1,16:1,17:1,19:1,20:1,21:''}.items():self.props[k]=v
@@ -47,11 +47,136 @@ class NativeUVExportTests(unittest.TestCase):
 
     def test_reject_bad_parameters(self):
         for changes in ({'width_px':True},{'height_px':249},{'timeout_seconds':0},{'quantity':'lux25'},
-                        {'screen_distance_m':25},{'view_bounds':[0,0,1,2]},
+                        {'screen_distance_m':25},{'display_mode':'not-a-mode'},
+                        {'display_mode':[]},{'scale_mode':'gamma'},{'show_contours':1},{'gamma_correction':1},
+                        {'display_mode':'contours','show_contours':False},
+                        {'display_mode':'color_contours','show_contours':False},
+                        {'view_bounds':[0,0,1,2]},
                         {'view_bounds':[0,1,float('nan'),2]},{'value_range':[-1,2]},
                         {'contours':[5,3]},{'contours':[True]},{'contours':[float('inf')]}):
             with self.subTest(changes=changes),self.assertRaises(ValueError):
                 uv.validate(lid_path=str(self.source),**changes)
+
+    def test_inline_progress_is_released_json_readable_by_existing_launcher(self):
+        from lucidshape_mcp.private_studio import _progress
+        script=uv.make_script(self.root,self.params,self.nonce)
+        self.assertNotIn('OStream(',script)
+        self.assertNotIn('void uvProgress(',script)
+        self.assertNotIn('@@',script)
+        # Native-tested inline JSONStore writes must stay observable by older launchers.
+        self.assertIn('object progress=JSONStore(',script)
+        self.assertIn('progress<<"entered main";progress=n;',script)
+        progress=self.root/'native-progress.txt'
+        progress.write_text(json.dumps({'List':{'p0':'captured bitmap'}}),encoding='utf-8')
+        observed=_progress(self.root)
+        self.assertTrue(observed['native_progress_observed'])
+        self.assertEqual(observed['native_progress_file'],str(progress))
+        self.assertIn('captured bitmap',observed['native_progress_tail'])
+
+    def test_input_metrics_are_captured_before_view_can_change_unit_flags(self):
+        params=uv.validate(lid_path=str(self.source),quantity='illuminance_25m')
+        script=uv.make_script(self.root,params,self.nonce)
+        view=script.index('app.createUVDataModelView(data)')
+        for expression in ('inputIsCandela=data.isInCandela()', 'inputAngleType=data.angleType()',
+                           'inputPeak=data.maxValue(inputU,inputV)', 'inputFlux=data.integral()'):
+            self.assertLess(script.index(expression),view)
+        receipt=script[script.index('object out=JSONStore('):]
+        self.assertIn('(inputPeak,inputU,inputV),inputFlux,view.getProperties(),inputIsCandela,inputAngleType',receipt)
+        self.assertNotIn('data.isInCandela()',receipt)
+        self.assertNotIn('data.maxValue(',receipt)
+        self.assertNotIn('data.integral()',receipt)
+
+    def test_25m_display_retains_native_values_and_labels_derived_peak(self):
+        self.params['quantity']='illuminance_25m'
+        self.props[9]=1
+        self.write_artifacts()
+        result=uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+        self.assertEqual(result['quantity'],'illuminance_25m')
+        self.assertEqual(result['value_unit'],'lx')
+        self.assertEqual(result['native_peak_value_u_v'],[100,0,0])
+        self.assertEqual(result['native_peak_value_unit'],'cd')
+        self.assertEqual(result['source_metrics_capture_stage'],'before_view_creation_and_display_configuration')
+        self.assertEqual(result['derived_display_peak_value_u_v'],[0.16,0,0])
+        self.assertEqual(result['angular_domain_flux_lm'],200)
+        self.assertFalse(result['display_transform']['source_files_modified'])
+        self.assertFalse(result['display_transform']['input_snapshot_files_modified'])
+        self.assertTrue(result['display_transform']['native_in_memory_unit_flags_may_change'])
+        self.assertNotIn('applied_to_source_data',result['display_transform'])
+        self.assertIn('derived',result['display_peak_provenance'])
+        self.assertEqual(hashlib.sha256(self.source.read_bytes()).hexdigest(),self.manifest[0]['source_sha256'])
+
+    def test_25m_rejects_native_candela_mode_and_noncandela_input(self):
+        self.params['quantity']='illuminance_25m'
+        self.write_artifacts()
+        with self.assertRaisesRegex(ValueError,'view properties'):
+            uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+        self.props[9]=1
+        self.fields[8]=0
+        self.write_artifacts()
+        with self.assertRaisesRegex(ValueError,'input quantity'):
+            uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+
+    def test_requested_display_modes_and_scale_modes_are_verified(self):
+        for display,display_value in {'spectrum':2,'grayscale':5,'contours':0,'color_contours':1,'bands':3}.items():
+            for scale,scale_value in {'logarithmic':1,'linear':0,'munsell':2}.items():
+                with self.subTest(display=display,scale=scale):
+                    overlay=display in ('contours','color_contours')
+                    self.params=uv.validate(lid_path=str(self.source),width_px=400,height_px=250,
+                                            display_mode=display,scale_mode=scale,show_contours=overlay)
+                    self.props[7]=display_value;self.props[12]=scale_value;self.props[19]=int(overlay)
+                    self.write_artifacts()
+                    result=uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+                    self.assertEqual(result['display_mode'],display)
+                    self.assertEqual(result['scale_mode'],scale)
+                    self.assertEqual(result['show_contours'],overlay)
+                    for index in (7,12,19):
+                        old=self.props[index];self.props[index]=999
+                        self.write_artifacts()
+                        with self.assertRaisesRegex(ValueError,'view properties'):
+                            uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+                        self.props[index]=old
+
+    def test_display_unit_range_and_contours_must_match_25m_request(self):
+        self.params=uv.validate(lid_path=str(self.source),width_px=400,height_px=250,
+                               quantity='illuminance_25m',value_range=[0.063,160],contours=[4])
+        self.props[9]=1;self.props[0]=[0.063,160];self.props[6]='4';self.props[13]=1
+        self.write_artifacts()
+        result=uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+        self.assertEqual(result['value_unit'],'lx')
+        self.props[6]='2500'
+        self.write_artifacts()
+        with self.assertRaisesRegex(ValueError,'contours differ'):
+            uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+        self.props[6]='4';self.props[0]=[39.375,100000]
+        self.write_artifacts()
+        with self.assertRaisesRegex(ValueError,'color range differs'):
+            uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+
+    def test_explicit_gamma_is_verified_while_none_preserves_native_flag(self):
+        for value in (False,True):
+            with self.subTest(value=value):
+                self.params['gamma_correction']=value
+                self.props[40]=int(value)
+                self.write_artifacts()
+                result=uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+                self.assertEqual(result['gamma_correction'],value)
+                self.props[40]=int(not value)
+                self.write_artifacts()
+                with self.assertRaisesRegex(ValueError,'view properties'):
+                    uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+        self.params['gamma_correction']=None
+        self.props[40]=1
+        self.write_artifacts()
+        result=uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
+        self.assertIsNone(result['requested_gamma_correction'])
+        self.assertTrue(result['gamma_correction'])
+
+    def test_explicit_gamma_rejects_receipt_without_gamma_property(self):
+        self.params['gamma_correction']=False
+        self.fields[7]=self.props[:37]
+        self.write_artifacts()
+        with self.assertRaisesRegex(ValueError,'view properties'):
+            uv.finalize(self.root,self.params,self.nonce,self.manifest,self.script_hash)
 
     def test_native_coordinates_are_not_limited_to_degrees(self):
         p=uv.validate(lid_path=str(self.source),quantity='native',view_bounds=[0,250,-30,30])

@@ -47,6 +47,9 @@ def registrar(server, engine):
                     result = fn(*args, **kwargs)
                     if inspect.isawaitable(result):
                         result = await result
+                    if isinstance(result, CallToolResult):
+                        result_type.model_validate(result.structuredContent)
+                        return result
                     return result_type.model_validate(result)
                 except (ValueError, OSError, RuntimeError) as error:
                     code = ('ACCESS_DENIED' if isinstance(error, PermissionError) else

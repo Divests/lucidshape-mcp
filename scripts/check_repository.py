@@ -20,6 +20,7 @@ SCRIPTS = {
 FIXTURES = {
     'tests/fixtures/invalid_model.lue', 'tests/fixtures/known_intensity.lid',
 }
+PACKAGE_DATA_FILES = {"lucidshape_mcp/templates/gb4599_2024.json"}
 PRIVATE_SUFFIXES = {
     '.catpart', '.catproduct', '.step', '.stp', '.igs', '.iges', '.stl',
     '.ray', '.lue', '.lug', '.lid', '.ies', '.pdf', '.docx', '.pptx', '.xlsx',
@@ -31,7 +32,7 @@ def allowed_path(name: str) -> bool:
     p = PurePosixPath(name)
     if p.is_absolute() or '..' in p.parts or '\\' in name:
         return False
-    if name in ROOT_FILES or name in FIXTURES:
+    if name in ROOT_FILES or name in FIXTURES or name in PACKAGE_DATA_FILES:
         return True
     if len(p.parts) == 1 and p.name.startswith('LICENSE'):
         return p.suffix.lower() not in PRIVATE_SUFFIXES

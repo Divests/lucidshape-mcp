@@ -1,4 +1,5 @@
 """MCP entry point using the official Python SDK, v1.x."""
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,6 +15,7 @@ from .studio_queries import get_api_catalog, inspect_objects, get_simulation_set
 from .uv_view_export import export_view as export_photometry_view
 from .static_road_export import generate_views as generate_static_road_views
 from .config import executable_path, work_directory
+from . import vehicle_lighting, ui_tools, ui_action_catalog, ui_dialog_catalog, ui_help
 
 
 def create_server(engine: BatchEngine) -> FastMCP:
@@ -33,6 +35,104 @@ def create_server(engine: BatchEngine) -> FastMCP:
     def get_capabilities() -> dict:
         """Report executable configuration and available batch templates without starting LucidShape."""
         return engine.capabilities()
+
+    @tool()
+    async def studio_list_ui_actions(query: str = "", profile: str = "studio", offset: int = 0,
+                                     limit: int = 50, executable_only: bool = False) -> dict:
+        """Search the installed Studio menu and toolbar definitions by label, symbol, tooltip or path.
+        profile=all includes alternate products and historical menus. executable_only shows declarations
+        with an enabled typed MCP equivalent. Inspect execution.scope before applying its preset."""
+        return await asyncio.to_thread(ui_tools.action_page, ui_tools.install_root(engine.command),
+            engine.policy.enabled_tools, query=query, profile=profile, offset=offset, limit=limit,
+            executable_only=executable_only)
+
+    @tool()
+    async def studio_get_ui_action(action_id: str, profile: str = "studio") -> dict:
+        """Resolve an installed declaration ID, source and any scoped tool/preset. Catalog-only entries
+        have no implemented execution adapter. Use the named target tool's input schema to run it."""
+        root = ui_tools.install_root(engine.command)
+        row = await asyncio.to_thread(ui_action_catalog.get_action, root,
+                                      action_id, profile=profile)
+        return ui_tools.describe(row, engine.policy.enabled_tools, profile, root)
+
+    @tool()
+    async def studio_list_dialog_controls(query: str = "", offset: int = 0, limit: int = 50) -> dict:
+        """Find installed dialog control declarations, including labels, choices, inputs and Apply
+        callbacks. Search by dialog source filename, control label or kind, e.g. 'valuesFromLID Apply'."""
+        return await asyncio.to_thread(ui_dialog_catalog.list_dialog_controls, ui_tools.install_root(engine.command),
+                                      query=query, offset=offset, limit=limit)
+
+    @tool()
+    async def studio_export_ui_catalog(profile: str = "studio") -> dict:
+        """Export all static menu and toolbar declarations and installed dialog controls to one UTF-8
+        JSON file in the server work directory. Includes provenance and scoped MCP bindings for this policy."""
+        return await asyncio.to_thread(ui_tools.export_catalog, ui_tools.install_root(engine.command),
+                                      engine.root, engine.policy.enabled_tools, profile)
+
+    @tool()
+    async def studio_run_ui_action(action_id: str, arguments: dict, profile: str = "studio") -> dict:
+        """Run a catalog entry with an enabled MCP binding. Supply parameters for its named target tool.
+        The selected entry fixes its action-specific presets. Batch actions return a job_id to poll."""
+        from .ui_run import run_action
+        return await run_action(server, engine, action_id, arguments, profile)
+
+    @tool()
+    async def studio_get_help_resource(action_id: str, profile: str = "studio") -> dict:
+        """Resolve a Help menu declaration to its installed PDF and validate the file signature."""
+        return await asyncio.to_thread(ui_help.help_resource, ui_tools.install_root(engine.command),
+                                      action_id, profile=profile)
+
+    @tool()
+    async def studio_list_live_menu(process_id: int | None = None, query: str = "",
+                                    offset: int = 0, limit: int = 50) -> dict:
+        """Inspect menu commands, labels and native enabled/checked flags currently exposed by a running
+        Studio of the configured installation. Pin process_id when multiple instances exist."""
+        from .ui_live_menu import list_live_menu
+        ui_tools.install_root(engine.command)
+        return await asyncio.to_thread(list_live_menu, Path(engine.command[0]), process_id=process_id,
+                                      query=query, offset=offset, limit=limit)
+
+    @tool()
+    async def create_geometry_primitive(primitive: str, dimensions_mm: list[float],
+                                        center_mm: list[float] | None = None, as_shape: bool | None = None,
+                                        timeout_seconds: int = 120) -> dict:
+        """Construct an axis-aligned primitive in a new private LucidShape model. Plane takes [width,height],
+        sphere [radius], cylinder [radius,length], disk [outer_radius,inner_radius],
+        cone [bottom_radius,top_radius,length], box [width,height,depth]. Use the installed Geometry
+        menu's supported preset for the primitive and its surface/shape variant. Poll the job for the
+        reloaded model and verified bounding box in mm."""
+        return await engine.submit_extension("create_geometry_primitive", primitive=primitive,
+            dimensions_mm=dimensions_mm, center_mm=center_mm, as_shape=as_shape, timeout_seconds=timeout_seconds)
+
+    @tool()
+    async def measure_photometry_region(lid_path: str, mode: str = "point",
+                                        coordinates_deg: list[float] | None = None,
+                                        unit: str | None = None, timeout_seconds: int = 120) -> dict:
+        """Run the Studio LID Measure Point or Zone calculation on saved Type A candela IES/LID.
+        Modes: point [u,v], zone_extrema/zone_mean/zone_flux [umin,umax,vmin,vmax], or
+        minimum/maximum/flux without coordinates. Units: cd, lx_25m, lx_10m; flux modes use lm."""
+        return await engine.submit_extension("measure_photometry_region", lid_path=lid_path, mode=mode,
+            coordinates_deg=coordinates_deg, unit=unit, timeout_seconds=timeout_seconds)
+
+    @tool()
+    async def photometry_apply_ui_action(data_path: str, command: str, passes: int = 1,
+                                         factor: float | None = None, timeout_seconds: int = 120) -> dict:
+        """Execute a supported Studio photometry command on a saved IES/LID copy, then export and check
+        the new IES. Find command symbols with studio_list_ui_actions. CM_UV_FILTER supports passes,
+        CM_UV_SCALE requires factor. The command is a fixed symbol from the photometry adapter."""
+        return await engine.submit_extension("photometry_apply_ui_action", data_path=data_path,
+            command=command, passes=passes, factor=factor, timeout_seconds=timeout_seconds)
+
+    @tool()
+    async def list_lighting_standards(standard_id: str | None = None, has_adb: bool = False) -> dict:
+        """List the installed lighting standards. Pass one returned identifier to get its input template and units. has_adb selects the ADB equipment variant."""
+        return await vehicle_lighting.catalog(standard_id, has_adb)
+
+    @tool()
+    async def evaluate_vehicle_lighting(project: dict | None = None, config_path: str | None = None,
+                                        timeout_seconds: int = 180) -> dict:
+        """Evaluate one vehicle across selected lighting standards. Supply either a project object (absolute local IES paths) or an absolute JSON config path (IES may be relative to it). Poll get_job for independent per-standard scores, missing inputs and JSON/XLSX artifacts. No CAD launch is needed."""
+        return await engine.submit_lighting(project, config_path, timeout_seconds)
 
     @tool()
     def list_jobs(status: str | None = None, offset: int = 0, limit: int = 50) -> dict:
@@ -104,15 +204,19 @@ def create_server(engine: BatchEngine) -> FastMCP:
     async def studio_export_photometry_view(lid_path: str, width_px: int = 1600,
             height_px: int = 900, quantity: str = "candela",
             view_bounds: list[float] | None = None, value_range: list[float] | None = None,
-            contours: list[float] | None = None, timeout_seconds: int = 120) -> dict:
-        """Export a native photometry view from a private IES/LID snapshot using a task-owned Studio process. Checks for existing Studio processes before launch; if present, save and close them once without manually reopening. This export profile requires exclusive startup. Failed task-owned exports are cleaned up; existing processes are never closed. Uses native view rendering, not screen capture or mouse/keyboard input. Original data and existing Studio documents are preserved. Only status=succeeded with image and native receipt confirms export; unavailable/unverified is not success. Does not retrace CAD geometry or certify compliance."""
+            contours: list[float] | None = None, display_mode: str = "spectrum",
+            scale_mode: str = "logarithmic", show_contours: bool = True,
+            gamma_correction: bool | None = None, timeout_seconds: int = 120) -> dict:
+        """Export a native photometry view from a private IES/LID snapshot using a task-owned Studio process. Checks for existing Studio processes before launch; if present, save and close them once without manually reopening. This export profile requires exclusive startup. Failed task-owned exports are cleaned up; existing processes are never closed. Uses native view rendering, not screen capture or mouse/keyboard input. Original data and existing Studio documents are preserved. Only status=succeeded with image and native receipt confirms export; unavailable/unverified is not success. Does not retrace CAD geometry or certify compliance. quantity=illuminance_25m displays candela/625 as equivalent lx, without editing input data; value_range/contours are in the selected display unit. display_mode: spectrum, grayscale, contours, color_contours, bands; scale_mode: logarithmic, linear, munsell. show_contours toggles the overlay. gamma_correction optionally sets the native display gamma flag; None preserves it and never changes input intensities."""
         if not engine.command:
             raise ValueError("Configure LUCIDSHAPE_EXE first")
         async with engine.native_session():
             return await export_photometry_view(engine.root, Path(engine.command[0]).parent / "LucidShape.exe",
                 lid_path=lid_path, width_px=width_px, height_px=height_px, quantity=quantity,
                 view_bounds=view_bounds, value_range=value_range,
-                contours=contours, timeout_seconds=timeout_seconds)
+                contours=contours, display_mode=display_mode, scale_mode=scale_mode,
+                show_contours=show_contours, gamma_correction=gamma_correction,
+                timeout_seconds=timeout_seconds)
 
     @tool()
     async def studio_generate_static_road_views(lid_path: str, lamp_positions_m: list[list[float]],
@@ -327,6 +431,12 @@ def create_server(engine: BatchEngine) -> FastMCP:
     def get_job(job_id: str) -> dict:
         """Read task status, input snapshot manifest, structured result (when available), and verified local artifact paths."""
         return engine.get_job(job_id)
+
+    @tool()
+    async def measure_photometry_table(lid_path: str, table: str, timeout_seconds: int = 120) -> dict:
+        """Run a native LucidShape angular candela test table on an already aimed Type A IES/LID. Select gb4599_2024_lb (base passing beam) or gb4599_2024_hb (neutral driving beam). Returns a job_id; poll get_job for measurement rows, native text, and uncovered items. Engineering precheck only."""
+        return await engine.submit_extension("measure_photometry_table", lid_path=lid_path, table=table,
+                                             timeout_seconds=timeout_seconds)
 
     @tool()
     async def compare_photometry(reference_path: str, candidate_path: str, timeout_seconds: int = 120) -> dict:

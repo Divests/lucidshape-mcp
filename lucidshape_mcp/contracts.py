@@ -78,7 +78,50 @@ class LiveResult(Response):
     backend: str | None = None
 
 
+class ActionBinding(BaseModel):
+    status: Literal["available", "catalog_only", "disabled_by_policy", "unavailable_on_installation"]
+    reason: str | None = None
+    tool: str | None = None
+    preset_arguments: dict[str, Any] = Field(default_factory=dict)
+    scope: str | None = None
+
+
+class UIAction(Response):
+    action_id: str | None = None
+    label: str | None = None
+    path: list[str] = Field(default_factory=list)
+    execution: ActionBinding | None = None
+
+
+class UIActionPage(Response):
+    actions: list[UIAction] = Field(default_factory=list)
+    total: int = 0
+    offset: int = 0
+    limit: int = 50
+    coverage: dict[str, Any] = Field(default_factory=dict)
+
+
+class DialogControlPage(Response):
+    controls: list[dict[str, Any]] = Field(default_factory=list)
+    total_controls: int = 0
+    matched_controls: int = 0
+    next_offset: int | None = None
+
+
+class LightingCatalog(Response):
+    engine_version: str | None = None
+    standards: list[dict[str, Any]] = Field(default_factory=list)
+
+
 def output_type(name):
+    if name == "studio_list_ui_actions":
+        return UIActionPage
+    if name == "studio_get_ui_action":
+        return UIAction
+    if name == "studio_list_dialog_controls":
+        return DialogControlPage
+    if name == "list_lighting_standards":
+        return LightingCatalog
     if name == 'get_capabilities':
         return CapabilityResult
     if name == 'list_jobs':

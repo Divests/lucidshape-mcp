@@ -17,7 +17,7 @@ from .catia import parameters as catia_parameters
 from .inputs import input_file, snapshot
 from .results import read_report
 from . import optical_scene, path_sampling, kernel_regions, boundary_paths, mesh_repair, gpu_trace, gpu_merge, ray_replay
-from . import extensions, road_simulation
+from . import extensions, road_simulation, vehicle_lighting
 from .config import geometry_available, geometry_runtime_path
 from .coordination import session_gate
 from .job_control import JobControl, utc_now
@@ -38,6 +38,7 @@ REPORT_TEMPLATES.add('merge_optical_batches')
 REPORT_TEMPLATES.add('replay_rayfile_batch')
 REPORT_TEMPLATES.update(extensions.OPERATIONS)
 REPORT_TEMPLATES.add('generate_road_views')
+REPORT_TEMPLATES.add(vehicle_lighting.OPERATION)
 ERROR_LINE = re.compile(rb"^\s*(?:error\b|compile error\b|runtime error\b|do not understand\b|LUCIDSHAPE_MCP_FAILED:)", re.IGNORECASE)
 
 
@@ -94,6 +95,8 @@ class BatchEngine(JobControl):
                 "runtime_path":str(geometry_runtime_path()) if geometry_runtime_path() is not None else None,
                 "purpose":"independent OCCT topology diagnosis and derived inner-lens snapshots; no GUI"},
             "photometry_export": "Native IES export from saved 2D non-spectral candela LID, with native readback and independent file checks; does not simulate or certify a lamp",
+            "vehicle_lighting": {"catalog_tool": "list_lighting_standards", "job_tool": vehicle_lighting.OPERATION,
+                                 "runtime_setting": "LUCIDSHAPE_LIGHTING_RUNTIME", "requires_cad": False},
             "model_formats": [".lue", ".lug"],
             "analysis": "2D non-spectral candela LID or IES; native peak and flux within the data domain or a supplied region",
             "optical_extensions": {"tools": sorted(extensions.OPERATIONS), "scope": "saved files in isolated jobs, not the current Studio document",
@@ -178,6 +181,26 @@ class BatchEngine(JobControl):
             self._save(record)
             raise
         return self._enqueue(record, expected)
+
+    async def submit_lighting(self, project=None, config_path=None, timeout_seconds=180):
+        self.policy.authorize(vehicle_lighting.OPERATION, {"config_path": config_path})
+        bounded_int(timeout_seconds, 1, 3600, "timeout_seconds")
+        if len(self._tasks) >= 16:
+            raise ValueError("Job queue is full")
+        script = vehicle_lighting.entrypoint()
+        job_id = uuid.uuid4().hex
+        directory = self._directory(job_id)
+        directory.mkdir(parents=True)
+        record = {"job_id": job_id, "template": vehicle_lighting.OPERATION,
+                  "status": "queued", "timeout_seconds": timeout_seconds, "artifacts": [],
+                  "runtime_entry": str(script), "entry_sha256": hashlib.sha256(script.read_bytes()).hexdigest()}
+        try:
+            record["inputs"] = vehicle_lighting.stage(directory, self.policy, project, config_path)
+        except Exception as error:
+            record.update(status="failed", error=f"Lighting input staging failed: {error}")
+            self._save(record)
+            raise
+        return self._enqueue(record, vehicle_lighting.OUTPUTS)
 
     async def submit_road_views(self, *, timeout_seconds: int = 180, **arguments) -> dict:
         """Queue a fixed, source-preserving native road projection."""
@@ -420,6 +443,9 @@ class BatchEngine(JobControl):
         script = None
         if not is_catia and not is_kernel:
             script = (TEMPLATES / (template + ".do")).read_text(encoding="ascii")
+            if template == "export_ies":
+                checked_writer = (TEMPLATES / "write_checked_ies.do").read_text(encoding="ascii")
+                script = script.replace("@@WRITE_CHECKED_IES@@", checked_writer)
             if template=='bin_rayfile':
                 script=optical_scene.render(script,parameters)
             if template=='replay_rayfile_batch':
@@ -511,17 +537,25 @@ class BatchEngine(JobControl):
             try:
                 record['phase'] = 'waiting_for_session'
                 self._save(record)
-                await stack.enter_async_context(self.native_session())
+                lighting = record["template"] == vehicle_lighting.OPERATION
+                await stack.enter_async_context(self._slots if lighting else self.native_session())
                 if (record["template"] in extensions.OPERATIONS or record["template"] == "generate_road_views") and hashlib.sha256(Path(self.command[0]).read_bytes()).hexdigest() != record["engine_sha256"]:
                     raise ValueError("Native engine changed after submission")
                 record["status"] = "running"
                 record.update(phase='running', started_at=utc_now())
                 self._save(record)
                 environment = os.environ.copy()
-                if record["template"] in CATIA_TEMPLATES:
+                if lighting:
+                    script = vehicle_lighting.entrypoint()
+                    if str(script) != record["runtime_entry"] or hashlib.sha256(script.read_bytes()).hexdigest() != record["entry_sha256"]:
+                        raise ValueError("Lighting runtime entry changed after submission")
+                    command = vehicle_lighting.command(script, "--job", str(directory))
+                elif record["template"] in CATIA_TEMPLATES:
                     command = (*self._catia_command, str(directory / "request.json"))
                 elif record['template'] in KERNEL_TEMPLATES:
                     command=(*self._kernel_command,str(directory/'request.json'))
+                elif record["template"] in ("measure_photometry_table", "measure_photometry_region"):
+                    command = (*self.command, str(directory / "job.do"))
                 else:
                     command = (*self.command, "-nopp", str(directory / "job.do"))
                 environment["PATH"] = str(Path(command[0]).parent) + os.pathsep + environment.get("PATH", "")
@@ -557,7 +591,9 @@ class BatchEngine(JobControl):
                     missing = [name for name in expected if not (directory / name).is_file() or (directory / name).stat().st_size == 0]
                     if process.returncode == 0 and marker_found and not missing and reported_error is None:
                         if record["template"] in REPORT_TEMPLATES:
-                            if record["template"] == "generate_road_views":
+                            if lighting:
+                                result, extra_files = vehicle_lighting.finalize(directory)
+                            elif record["template"] == "generate_road_views":
                                 result, extra_files = road_simulation.finalize(directory, record["parameters"])
                             else:
                                 reader = extensions.read_report if record["template"] in extensions.OPERATIONS else read_report
@@ -576,6 +612,15 @@ class BatchEngine(JobControl):
                             record["result"] = result
                         record["status"] = "succeeded"
                         record["artifacts"] = [{"name": name, "path": str(directory / name), "bytes": (directory / name).stat().st_size} for name in expected]
+                    elif lighting and process.returncode == 2 and not marker_found:
+                        if not missing:
+                            result, _ = vehicle_lighting.finalize(directory, failed=True)
+                            details = (f"{key}: {s['error']}" for key, s in result["summary"].items())
+                            record.update(status="failed", error=" | ".join(details)[:3500], result=result)
+                            record["artifacts"] = [{"name": name, "path": str(directory / name),
+                                                    "bytes": (directory / name).stat().st_size} for name in expected]
+                        else:
+                            record.update(status="failed", error=vehicle_lighting.failure_message(directory))
                     else:
                         record.update(status="failed", error=f"Batch verification failed: exit={process.returncode}, success_marker={marker_found}, missing_artifacts={missing}, engine_error={reported_error}; inspect engine.log")
             except asyncio.CancelledError:

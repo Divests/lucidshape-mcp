@@ -33,4 +33,9 @@ if(@@HAS_REGION@@) {
 object out=JSONStore("engine-result.json",0,1);
 out << (lid.getName(),lid.angleType(),(lid.sizeU(),lid.sizeV(),lid.sizeW(),lid.sizeT()),(u0,u1,v0,v1),(peak,peakU,peakV),minVal,lid.integral(),regionFlux);
 out=null;
+// Optional native preview, with the unchanged eight-field numeric report above.
+// LS2.0 tasks/saveUVDataAsBMPDialog.do: log=1; UI color=2 maps to native=5.
+// Verified LS2.0 output is grayscale despite the UI color mapping above.
+// This is an automatic-range data bitmap without axes, contours or a color bar.
+lid.saveUVAsBMP("photometry-native.png",1,5,0,0);
 cout << "LUCIDSHAPE_MCP_OK" << endl;

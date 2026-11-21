@@ -17,7 +17,7 @@ $py = "C:\lucidshape-mcp\venv\Scripts\python.exe"
 & $py -m lucidshape_mcp check
 ```
 
-最后一条应输出 `"status": "passed"` 和 40 个工具。
+最后一条应输出 `"status": "passed"` 和 53 个工具。
 
 在 DSH 会话里执行 `scripts/bootstrap.py` 或 pip 时，DSH 的文件沙箱会影响安装：pip 写 HTTP 缓存时可能长时间空转（CPU 在涨、没有网络连接、没有输出），临时目录也可能不可写并报 `Permission denied ...\Temp\...\pip-unpack-*`。两种情况都用 `--no-cache-dir` 规避，必要时把 `$env:TEMP`/`$env:TMP` 指到可写目录；仍然不行就换到普通 PowerShell 窗口。
 

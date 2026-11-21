@@ -7,11 +7,13 @@ import json
 import math
 from pathlib import Path
 
+from . import photometry_tables, ui_action_dispatch, ui_geometry, ui_measure
 from .inputs import decode_text, input_file, snapshot
 from .results import count, number, sequence, string
 from .studio_queries import common_script
 
-OPERATIONS = {"compare_photometry", "inspect_optical_parameters", "set_emitter_parameters", "run_parameter_sweep"}
+OPERATIONS = {ui_measure.OPERATION, ui_action_dispatch.OPERATION, ui_geometry.OPERATION,
+              "measure_photometry_table", "compare_photometry", "inspect_optical_parameters", "set_emitter_parameters", "run_parameter_sweep"}
 VERIFIED_ENGINE = "1e64931b79d18a06f6a5eeb00663f23f33bd236428dc97568269ae53d2db9a48"
 TEMPLATES = Path(__file__).with_name("templates")
 
@@ -33,6 +35,14 @@ def validate(operation, arguments):
     if operation not in OPERATIONS:
         raise ValueError("Unknown optical extension")
     p = dict(arguments)
+    if operation == ui_geometry.OPERATION:
+        return ui_geometry.validate(p)
+    if operation == ui_measure.OPERATION:
+        return ui_measure.validate(p)
+    if operation == ui_action_dispatch.OPERATION:
+        return ui_action_dispatch.validate(p)
+    if operation == "measure_photometry_table":
+        return photometry_tables.validate(p)
     if operation == "compare_photometry":
         for key in ("reference_path", "candidate_path"):
             p[key] = str(input_file(p[key], {".lid", ".ies"}))
@@ -64,6 +74,14 @@ def native_changes(change):
 
 
 def stage(directory, operation, p):
+    if operation == ui_geometry.OPERATION:
+        return ui_geometry.stage(directory, p)
+    if operation == ui_measure.OPERATION:
+        return ui_measure.stage(directory, p)
+    if operation == ui_action_dispatch.OPERATION:
+        return ui_action_dispatch.stage(directory, p)
+    if operation == "measure_photometry_table":
+        return photometry_tables.stage(directory, p)
     replacements = {}
     expected = ["engine-result.json"]
     if operation == "compare_photometry":
@@ -236,6 +254,8 @@ def compare(directory, raw):
 
 
 def read_report(directory, operation, p):
+    if operation == ui_action_dispatch.OPERATION:
+        return ui_action_dispatch.verify(directory, p)
     path = directory / "engine-result.json"
     if path.stat().st_size > 8 * 1024 * 1024:
         raise ValueError("Optical extension receipt is too large")
@@ -246,6 +266,12 @@ def read_report(directory, operation, p):
     if set(fields) != {f"p{i}" for i in range(len(fields))}:
         raise ValueError("Invalid receipt field numbering")
     rows = [fields[f"p{i}"] for i in range(len(fields))]
+    if operation == ui_geometry.OPERATION:
+        return ui_geometry.verify(rows, p)
+    if operation == ui_measure.OPERATION:
+        return ui_measure.verify(rows, p)
+    if operation == "measure_photometry_table":
+        return photometry_tables.verify(directory, rows, p["table"])
     if operation == "compare_photometry":
         return compare(directory, rows)
     if operation == "inspect_optical_parameters":

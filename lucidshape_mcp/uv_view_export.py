@@ -8,6 +8,8 @@ from .results import sequence,number
 
 STUDIO_SHA256='60c8339e075346ffd224816810fdb50ecb2c5097d3ce891b5e06df13548312ab'
 TEMPLATE=Path(__file__).with_name('templates')/'uv_view_export.lus'
+DISPLAY_MODES={'spectrum':2,'grayscale':5,'contours':0,'color_contours':1,'bands':3}
+SCALE_MODES={'logarithmic':1,'linear':0,'munsell':2}
 
 def _range(value,n,name):
     if value is None:return None
@@ -16,12 +18,17 @@ def _range(value,n,name):
     if any(value[i]>=value[i+1] for i in range(0,n,2)):raise ValueError(name+' must increase')
     return [float(v) for v in value]
 
-def validate(*,lid_path,width_px=1600,height_px=900,quantity='candela',screen_distance_m=None,view_bounds=None,value_range=None,contours=None,timeout_seconds=120):
+def validate(*,lid_path,width_px=1600,height_px=900,quantity='candela',screen_distance_m=None,view_bounds=None,value_range=None,contours=None,display_mode='spectrum',scale_mode='logarithmic',show_contours=True,gamma_correction=None,timeout_seconds=120):
     source=input_file(lid_path,{'.ies','.lid'})
     for val,lo,hi,name in [(width_px,400,4000,'width_px'),(height_px,250,2400,'height_px'),(timeout_seconds,1,600,'timeout_seconds')]:
         if isinstance(val,bool) or not isinstance(val,int) or not lo<=val<=hi:raise ValueError(name+' outside supported integer range')
     if width_px*height_px>8000000:raise ValueError('At most 8 million pixels')
-    if quantity not in ('candela','native') or screen_distance_m is not None:raise ValueError('Supported quantities are candela/native; screen-distance conversion is not implemented')
+    if quantity not in ('candela','native','illuminance_25m') or screen_distance_m is not None:raise ValueError('Supported quantities are candela/native/illuminance_25m; arbitrary screen distances are not supported')
+    if not isinstance(display_mode,str) or display_mode not in DISPLAY_MODES:raise ValueError('Unsupported display_mode')
+    if not isinstance(scale_mode,str) or scale_mode not in SCALE_MODES:raise ValueError('Unsupported scale_mode')
+    if not isinstance(show_contours,bool):raise ValueError('show_contours must be boolean')
+    if display_mode in ('contours','color_contours') and not show_contours:raise ValueError('Contour display modes require show_contours=True')
+    if gamma_correction is not None and not isinstance(gamma_correction,bool):raise ValueError('gamma_correction must be boolean or None')
     view_bounds=_range(view_bounds,4,'view_bounds');value_range=_range(value_range,2,'value_range')
     if view_bounds and any(abs(v)>100000 for v in view_bounds):raise ValueError('view_bounds outside -100000..100000 native units')
     if value_range and (value_range[0]<0 or value_range[1]>1e12):raise ValueError('value_range outside 0..1e12 native units')
@@ -30,7 +37,7 @@ def validate(*,lid_path,width_px=1600,height_px=900,quantity='candela',screen_di
         if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or not 0<v<=1e12 for v in contours):raise ValueError('contours must be positive finite native values')
         if any(a>=b for a,b in zip(contours,contours[1:])):raise ValueError('contours must be strictly increasing')
         contours=[float(v) for v in contours]
-    return dict(lid_path=str(source),width_px=width_px,height_px=height_px,quantity=quantity,view_bounds=view_bounds,value_range=value_range,contours=contours,timeout_seconds=timeout_seconds)
+    return dict(lid_path=str(source),width_px=width_px,height_px=height_px,quantity=quantity,view_bounds=view_bounds,value_range=value_range,contours=contours,display_mode=display_mode,scale_mode=scale_mode,show_contours=show_contours,gamma_correction=gamma_correction,timeout_seconds=timeout_seconds)
 
 def _native(value):
     if isinstance(value,list):return '('+','.join(_native(v) for v in value)+')'
@@ -40,12 +47,13 @@ def _native(value):
 def make_script(directory,parameters,nonce):
     p=parameters;source=Path(p['lid_path']);staged=directory/('input'+source.suffix.lower())
     mods=[]
+    if p.get('gamma_correction') is not None:mods.append('props[40]='+str(int(p['gamma_correction']))+';')
     if p['view_bounds'] is not None:mods.append('props[2]='+_native(p['view_bounds'])+';')
     if p['value_range'] is not None:mods.append('props[0]='+_native(p['value_range'])+';props[15]=1;')
     if p['contours'] is not None:
         text=' '.join(format(v,'.15g') for v in p['contours'])
         mods.append('props[6]='+_native(text)+';props[13]=1;props[36]=('+_native(text)+');props[35]=0;')
-    values={'SOURCE':_native(staged.as_posix()),'IS_IES':'1' if source.suffix.lower()=='.ies' else '0','REQUIRE_CD':'1' if p['quantity']=='candela' else '0','PNG':_native((directory/'photometry-native.png').as_posix()),'RECEIPT':_native((directory/'native-receipt.json').as_posix()),'PROGRESS':_native((directory/'native-progress.txt').as_posix()),'NONCE':_native(nonce),'WIDTH':str(p['width_px']),'HEIGHT':str(p['height_px']),'MODS':'\n'.join(mods)}
+    values={'SOURCE':_native(staged.as_posix()),'IS_IES':'1' if source.suffix.lower()=='.ies' else '0','REQUIRE_CD':'1' if p['quantity'] in ('candela','illuminance_25m') else '0','DISPLAY_QUANTITY':'1' if p['quantity']=='illuminance_25m' else '0','DISPLAY_MODE':str(DISPLAY_MODES[p.get('display_mode','spectrum')]),'SCALE_MODE':str(SCALE_MODES[p.get('scale_mode','logarithmic')]),'SHOW_CONTOURS':'1' if p.get('show_contours',True) else '0','PNG':_native((directory/'photometry-native.png').as_posix()),'RECEIPT':_native((directory/'native-receipt.json').as_posix()),'PROGRESS':_native((directory/'native-progress.txt').as_posix()),'NONCE':_native(nonce),'WIDTH':str(p['width_px']),'HEIGHT':str(p['height_px']),'MODS':'\n'.join(mods)}
     text=TEMPLATE.read_text(encoding='utf-8')
     for key,value in values.items():text=text.replace('@@'+key+'@@',value)
     if '@@' in text:raise ValueError('Unexpanded native template')
@@ -91,11 +99,14 @@ def finalize(directory,parameters,nonce,manifest,script_sha256):
     if kind!='UVView':raise ValueError('Unexpected native view class')
     angle_type=number(angle_type)
     if is_candela and angle_type not in (0,1):raise ValueError('Only native angle types 0/1 support candela U/V export')
-    if isinstance(is_candela,bool) or is_candela not in (0,1) or (parameters['quantity']=='candela' and is_candela!=1):raise ValueError('Native input quantity differs')
+    if isinstance(is_candela,bool) or is_candela not in (0,1) or (parameters['quantity'] in ('candela','illuminance_25m') and is_candela!=1):raise ValueError('Native input quantity differs')
     size=sequence(size,2)
     if [number(v) for v in size]!=[parameters['width_px'],parameters['height_px']]:raise ValueError('Native window size differs')
     props=sequence(properties)
-    if len(props)<22 or any(props[k]!=v for k,v in {7:2,9:0,10:0,11:0,12:1,16:1,17:1,19:1,20:1}.items()):raise ValueError('Native view properties differ from verified export profile')
+    display_mode=parameters.get('display_mode','spectrum');scale_mode=parameters.get('scale_mode','logarithmic');show_contours=parameters.get('show_contours',True)
+    expected={7:DISPLAY_MODES[display_mode],9:int(parameters['quantity']=='illuminance_25m'),10:0,11:0,12:SCALE_MODES[scale_mode],16:1,17:1,19:int(show_contours),20:1}
+    if parameters.get('gamma_correction') is not None:expected[40]=int(parameters['gamma_correction'])
+    if len(props)<=max(21,max(expected)) or any(props[k]!=v for k,v in expected.items()):raise ValueError('Native view properties differ from requested export profile')
     if parameters['view_bounds'] is not None and sequence(props[2],4)!=parameters['view_bounds']:raise ValueError(f"Native view range differs: requested {parameters['view_bounds']}, actual {props[2]}; use native pixel-edge bounds")
     if parameters['value_range'] is not None and sequence(props[0],2)!=parameters['value_range']:raise ValueError('Native color range differs')
     if parameters['contours'] is not None:
@@ -108,11 +119,34 @@ def finalize(directory,parameters,nonce,manifest,script_sha256):
         source=Path(entry['source'])
         if hashlib.sha256(source.read_bytes()).hexdigest()!=entry['source_sha256']:raise ValueError('Source changed during export')
         if hashlib.sha256((directory/entry['staged_name']).read_bytes()).hexdigest()!=entry['staged_sha256']:raise ValueError('Input snapshot changed during export')
-    return {'status':'succeeded','image':str(directory/'photometry-native.png'),'image_verification':image,'native_peak_value_u_v':peak,'native_domain_integral':flux,'native_angle_type':angle_type,'native_uv_semantics':'native photometric U/V degrees (angle type 0 or 1)' if is_candela else 'native planar/data coordinates; no angular conversion','angular_domain_flux_lm':flux if is_candela else None,'quantity':'candela' if is_candela else 'native','value_unit':'cd' if is_candela else 'from native data (unconverted)','native_frame_name':props[21] if len(props)>21 else None,'native_view_class':kind,'axes':True,'color_bar':True,'contours':True,'native_display':'logarithmic color with native axes, grid, contours, color bar and labels','source_files_unchanged':True,'input_snapshots_unchanged':True,'executed_script_sha256':script_sha256,'source_geometry_retraced':False,'regulatory_assessment':False,'native_properties':props}
+    equivalent_25m=parameters['quantity']=='illuminance_25m'
+    quantity='illuminance_25m' if equivalent_25m else ('candela' if is_candela else 'native')
+    unit='lx' if equivalent_25m else ('cd' if is_candela else 'from native data (unconverted)')
+    transform={'kind':'candela_to_25m_equivalent_illuminance' if equivalent_25m else 'identity',
+               'factor':1/625 if equivalent_25m else 1,'source_files_modified':False,
+               'input_snapshot_files_modified':False,'native_in_memory_unit_flags_may_change':True,
+               'screen_distance_m':25 if equivalent_25m else None,
+               'definition':'Native display-managed unit conversion I/625; source and snapshot file values unchanged; not planar-screen incidence/distance correction' if equivalent_25m else 'Native display quantity; source and snapshot file values unchanged'}
+    return {'status':'succeeded','image':str(directory/'photometry-native.png'),'image_verification':image,
+            'native_peak_value_u_v':peak,'native_peak_value_unit':'cd' if is_candela else 'native input unit',
+            'source_metrics_capture_stage':'before_view_creation_and_display_configuration',
+            'native_domain_integral':flux,'native_angle_type':angle_type,
+            'native_uv_semantics':'native photometric U/V degrees (angle type 0 or 1)' if is_candela else 'native planar/data coordinates; no angular conversion',
+            'angular_domain_flux_lm':flux if is_candela else None,'quantity':quantity,'requested_quantity':parameters['quantity'],'value_unit':unit,
+            'display_transform':transform,'derived_display_peak_value_u_v':[peak[0]/625,peak[1],peak[2]] if equivalent_25m else None,
+            'display_peak_provenance':'derived from native input peak by I/625; not independently measured from the view' if equivalent_25m else None,
+            'display_mode':display_mode,'scale_mode':scale_mode,'show_contours':show_contours,
+            'requested_gamma_correction':parameters.get('gamma_correction'),
+            'gamma_correction':bool(props[40]) if len(props)>40 and props[40] in (0,1) else None,
+            'native_frame_name':props[21] if len(props)>21 else None,'native_view_class':kind,
+            'axes':True,'grid':True,'color_bar':True,'contours':show_contours,
+            'native_display':f'{scale_mode} {display_mode} with native axes, grid, color bar and labels; contours={show_contours}',
+            'source_files_unchanged':True,'input_snapshots_unchanged':True,'executed_script_sha256':script_sha256,
+            'source_geometry_retraced':False,'regulatory_assessment':False,'native_properties':props}
 
-async def export_view(root:Path,executable:Path,*,lid_path:str,width_px=1600,height_px=900,quantity='candela',screen_distance_m=None,view_bounds=None,value_range=None,contours=None,timeout_seconds=120,process_id=None,transport=None)->dict:
+async def export_view(root:Path,executable:Path,*,lid_path:str,width_px=1600,height_px=900,quantity='candela',screen_distance_m=None,view_bounds=None,value_range=None,contours=None,display_mode='spectrum',scale_mode='logarithmic',show_contours=True,gamma_correction=None,timeout_seconds=120,process_id=None,transport=None)->dict:
     if process_id is not None:raise ValueError('This verified exporter supports private owned Studio jobs only; omit process_id')
-    parameters=validate(lid_path=lid_path,width_px=width_px,height_px=height_px,quantity=quantity,screen_distance_m=screen_distance_m,view_bounds=view_bounds,value_range=value_range,contours=contours,timeout_seconds=timeout_seconds)
+    parameters=validate(lid_path=lid_path,width_px=width_px,height_px=height_px,quantity=quantity,screen_distance_m=screen_distance_m,view_bounds=view_bounds,value_range=value_range,contours=contours,display_mode=display_mode,scale_mode=scale_mode,show_contours=show_contours,gamma_correction=gamma_correction,timeout_seconds=timeout_seconds)
     executable=Path(executable).resolve()
     if executable.name.lower()=='lush.exe':executable=executable.with_name('LucidShape.exe')
     if not executable.is_file() or hashlib.sha256(executable.read_bytes()).hexdigest()!=STUDIO_SHA256:raise ValueError('Installed Studio differs from the verified UVView export profile')

@@ -1,0 +1,522 @@
+{
+  "standard": "GB 4599-2024",
+  "scope": "Engineering precheck for base passing beam, Table 1 A, and neutral driving beam, Table 5; single-module absolute candela, same aim as input",
+  "units": {
+    "positions": "H,V degrees; positive right, positive up",
+    "intensity": "cd"
+  },
+  "sources": {
+    "official": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=D88797E512723F8CBF170A20E81F27AD",
+    "fulltext": "https://img.lightingchina.com.cn/article/160600/file/1729736748184914.pdf",
+    "LB": "8.1, 8.2.1, Figure 1, 8.2.2, Table 1 A",
+    "LB+HB": "8.1, 8.3.1, Figure 2, 8.3.2, Table 5"
+  },
+  "rules": [
+    {
+      "test_id": "B50L",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          -3.43,
+          0.57
+        ]
+      ],
+      "max_cd": 350
+    },
+    {
+      "test_id": "BR",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          2.5,
+          1
+        ]
+      ],
+      "max_cd": 1750
+    },
+    {
+      "test_id": "BLL",
+      "beam": "LB",
+      "operation": "line_max",
+      "positions_deg": [
+        [
+          -20,
+          0.57
+        ],
+        [
+          -8,
+          0.57
+        ]
+      ],
+      "max_cd": 625
+    },
+    {
+      "test_id": "P",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          -7,
+          0
+        ]
+      ],
+      "min_cd": 63
+    },
+    {
+      "test_id": "IIIa",
+      "beam": "LB",
+      "operation": "polygon_max",
+      "positions_deg": [
+        [
+          -8,
+          1
+        ],
+        [
+          -8,
+          4
+        ],
+        [
+          8,
+          4
+        ],
+        [
+          8,
+          2
+        ],
+        [
+          6,
+          1.5
+        ],
+        [
+          1.5,
+          1.5
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          -4,
+          0
+        ]
+      ],
+      "max_cd": 625
+    },
+    {
+      "test_id": "S50_SUM",
+      "beam": "LB",
+      "operation": "sum",
+      "positions_deg": [
+        [
+          -8,
+          4
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          8,
+          4
+        ]
+      ],
+      "min_cd": 190
+    },
+    {
+      "test_id": "S100_SUM",
+      "beam": "LB",
+      "operation": "sum",
+      "positions_deg": [
+        [
+          -4,
+          2
+        ],
+        [
+          0,
+          2
+        ],
+        [
+          4,
+          2
+        ]
+      ],
+      "min_cd": 375
+    },
+    {
+      "test_id": "75R",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          1.15,
+          -0.57
+        ]
+      ],
+      "min_cd": 12100
+    },
+    {
+      "test_id": "50R",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          1.72,
+          -0.86
+        ]
+      ],
+      "min_cd": 10100
+    },
+    {
+      "test_id": "50V",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          0,
+          -0.86
+        ]
+      ],
+      "min_cd": 5100
+    },
+    {
+      "test_id": "50L",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          -3.43,
+          -0.86
+        ]
+      ],
+      "min_cd": 5000,
+      "max_cd": 37000
+    },
+    {
+      "test_id": "40R",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          9,
+          -1.07
+        ]
+      ],
+      "min_cd": 2800
+    },
+    {
+      "test_id": "40L",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          -9,
+          -1.07
+        ]
+      ],
+      "min_cd": 2800
+    },
+    {
+      "test_id": "25V",
+      "beam": "LB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          0,
+          -1.72
+        ]
+      ],
+      "min_cd": 2500
+    },
+    {
+      "test_id": "LINE50",
+      "beam": "LB",
+      "operation": "line_min",
+      "positions_deg": [
+        [
+          -6.84,
+          -0.86
+        ],
+        [
+          6.84,
+          -0.86
+        ]
+      ],
+      "min_cd": 2540
+    },
+    {
+      "test_id": "LINE40RR",
+      "beam": "LB",
+      "operation": "line_min",
+      "positions_deg": [
+        [
+          9,
+          -1.07
+        ],
+        [
+          14,
+          -1.07
+        ]
+      ],
+      "min_cd": 850
+    },
+    {
+      "test_id": "LINE40LL",
+      "beam": "LB",
+      "operation": "line_min",
+      "positions_deg": [
+        [
+          -14,
+          -1.07
+        ],
+        [
+          -9,
+          -1.07
+        ]
+      ],
+      "min_cd": 850
+    },
+    {
+      "test_id": "LINE25R",
+      "beam": "LB",
+      "operation": "line_min",
+      "positions_deg": [
+        [
+          9,
+          -1.72
+        ],
+        [
+          16,
+          -1.72
+        ]
+      ],
+      "min_cd": 1180
+    },
+    {
+      "test_id": "LINE25",
+      "beam": "LB",
+      "operation": "line_min",
+      "positions_deg": [
+        [
+          -9,
+          -1.72
+        ],
+        [
+          9,
+          -1.72
+        ]
+      ],
+      "min_cd": 1700
+    },
+    {
+      "test_id": "LINE25L",
+      "beam": "LB",
+      "operation": "line_min",
+      "positions_deg": [
+        [
+          -16,
+          -1.72
+        ],
+        [
+          -9,
+          -1.72
+        ]
+      ],
+      "min_cd": 1180
+    },
+    {
+      "test_id": "LINE15",
+      "beam": "LB",
+      "operation": "line_min",
+      "positions_deg": [
+        [
+          -20,
+          -2.86
+        ],
+        [
+          20,
+          -2.86
+        ]
+      ],
+      "min_cd": 425
+    },
+    {
+      "test_id": "LINE10",
+      "beam": "LB",
+      "operation": "line_min",
+      "positions_deg": [
+        [
+          -4.5,
+          -4
+        ],
+        [
+          2,
+          -4
+        ]
+      ],
+      "min_cd": 500
+    },
+    {
+      "test_id": "LINE10_AND_BELOW",
+      "beam": "LB",
+      "operation": "line10_below_max",
+      "positions_deg": [
+        [
+          -4.5,
+          -4
+        ],
+        [
+          2,
+          -4
+        ]
+      ],
+      "max_relative": {
+        "test_id": "50R",
+        "factor": 0.8
+      },
+      "coverage_note": "Standard table specifies Line 10 and below (4D and below). The PDF and Figure 1 must justify the lower/angular extent before an unconditional pass. No arbitrary 5D cutoff or finite-domain substitution."
+    },
+    {
+      "test_id": "Imax",
+      "beam": "LB+HB",
+      "operation": "domain_max",
+      "positions_deg": [],
+      "min_cd": 40000,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "HV",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          0,
+          0
+        ]
+      ],
+      "min_relative": {
+        "test_id": "Imax",
+        "factor": 0.8
+      },
+      "max_cd": 215000
+    },
+    {
+      "test_id": "12L-H",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          -12,
+          0
+        ]
+      ],
+      "min_cd": 1500,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "9L-H",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          -9,
+          0
+        ]
+      ],
+      "min_cd": 3400,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "6L-H",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          -6,
+          0
+        ]
+      ],
+      "min_cd": 5000,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "3L-H",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          -3,
+          0
+        ]
+      ],
+      "min_cd": 17500,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "3R-H",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          3,
+          0
+        ]
+      ],
+      "min_cd": 17500,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "6R-H",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          6,
+          0
+        ]
+      ],
+      "min_cd": 5000,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "9R-H",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          9,
+          0
+        ]
+      ],
+      "min_cd": 3400,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "12R-H",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          12,
+          0
+        ]
+      ],
+      "min_cd": 1500,
+      "max_cd": 215000
+    },
+    {
+      "test_id": "V-2U",
+      "beam": "LB+HB",
+      "operation": "point",
+      "positions_deg": [
+        [
+          0,
+          2
+        ]
+      ],
+      "min_cd": 1700,
+      "max_cd": 215000
+    }
+  ]
+}

@@ -40,6 +40,132 @@ def _progress(directory):
     return {"native_progress_observed": False}
 
 
+class _WindowTextReader:
+    """Small read-only Win32 surface; no input, activation, DDE or UI automation."""
+
+    def __init__(self):
+        import ctypes
+        from ctypes import wintypes
+        self.ctypes = ctypes
+        self.callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        self.user32 = ctypes.WinDLL("user32", use_last_error=True)
+        signatures = {
+            "EnumWindows": ([self.callback_type, wintypes.LPARAM], wintypes.BOOL),
+            "EnumChildWindows": ([wintypes.HWND, self.callback_type, wintypes.LPARAM], wintypes.BOOL),
+            "GetWindowThreadProcessId": ([wintypes.HWND, ctypes.POINTER(wintypes.DWORD)], wintypes.DWORD),
+            "GetClassNameW": ([wintypes.HWND, wintypes.LPWSTR, ctypes.c_int], ctypes.c_int),
+            "GetWindowTextW": ([wintypes.HWND, wintypes.LPWSTR, ctypes.c_int], ctypes.c_int),
+            "IsWindowVisible": ([wintypes.HWND], wintypes.BOOL),
+            "SendMessageTimeoutW": ([wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
+                                     wintypes.LPARAM, wintypes.UINT, wintypes.UINT,
+                                     ctypes.POINTER(ctypes.c_size_t)], wintypes.LPARAM),
+        }
+        for name, (args, result) in signatures.items():
+            fn = getattr(self.user32, name)
+            fn.argtypes, fn.restype = args, result
+
+    def enumerate(self, callback, parent=None):
+        native_callback = self.callback_type(lambda hwnd, _: bool(callback(hwnd)))
+        if parent is None:
+            self.user32.EnumWindows(native_callback, 0)
+        else:
+            self.user32.EnumChildWindows(parent, native_callback, 0)
+
+    def pid(self, hwnd):
+        from ctypes import wintypes
+        pid = wintypes.DWORD()
+        self.user32.GetWindowThreadProcessId(hwnd, self.ctypes.byref(pid))
+        return pid.value
+
+    def class_name(self, hwnd):
+        buf = self.ctypes.create_unicode_buffer(128)
+        self.user32.GetClassNameW(hwnd, buf, len(buf))
+        return buf.value
+
+    def title(self, hwnd):
+        # Cross-process top-level captions are read without sending WM_GETTEXT.
+        buf = self.ctypes.create_unicode_buffer(513)
+        self.user32.GetWindowTextW(hwnd, buf, len(buf))
+        return buf.value
+
+    def visible(self, hwnd):
+        return bool(self.user32.IsWindowVisible(hwnd))
+
+    def static_text(self, hwnd):
+        # Only called after PID and exact Static-class checks. Never read Edit.
+        buf = self.ctypes.create_unicode_buffer(513)
+        count = self.ctypes.c_size_t()
+        ok = self.user32.SendMessageTimeoutW(
+            hwnd, 0x000D, len(buf), self.ctypes.addressof(buf), 0x0002, 50,
+            self.ctypes.byref(count))  # WM_GETTEXT / SMTO_ABORTIFHUNG, 50 ms
+        return buf.value if ok else None
+
+
+def _owned_window_diagnostics(process):
+    """Bounded timeout evidence from the still-owned Popen process only.
+
+    A missing dialog does not prove a cause. Captions may be useful diagnostics,
+    but do not grant authority to dismiss a dialog or change application settings.
+    """
+    result = {"pid": process.pid, "read_only": True, "sample_stage": "timeout_before_cleanup",
+              "scope": "owned process top-level captions and dialog Static text only",
+              "windows": [], "truncated": False,
+              "limits": {"top_windows": 32, "enumerated_windows": 4096,
+                         "dialog_children": 128, "static_text_reads": 32,
+                         "text_characters": 512, "static_query_timeout_ms": 50}}
+    if _PROCESSES.get(process.pid) is not process or process.poll() is not None:
+        result.update(status="skipped", reason="No live owned Popen handle; no windows inspected")
+        return result
+    try:
+        api = _WindowTextReader()
+        enumerated, text_reads = 0, 0
+
+        def top_window(hwnd):
+            nonlocal enumerated, text_reads
+            enumerated += 1
+            if enumerated > 4096 or len(result["windows"]) >= 32:
+                result["truncated"] = True
+                return False
+            if process.poll() is not None:
+                return False
+            if api.pid(hwnd) != process.pid:
+                return True
+            kind = api.class_name(hwnd)
+            item = {"class_name": kind[:127], "title": api.title(hwnd)[:512],
+                    "visible": api.visible(hwnd)}
+            result["windows"].append(item)
+            if kind == "#32770":
+                item["static_text"] = []
+                children = 0
+
+                def child_window(child):
+                    nonlocal children, text_reads
+                    children += 1
+                    if children > 128 or text_reads >= 32:
+                        result["truncated"] = True
+                        return False
+                    if process.poll() is not None:
+                        return False
+                    if api.pid(child) != process.pid or api.class_name(child) != "Static":
+                        return True
+                    text_reads += 1
+                    text = api.static_text(child)
+                    if text is None:
+                        item["static_text_query_timeouts"] = item.get("static_text_query_timeouts", 0) + 1
+                    elif text:
+                        item["static_text"].append(text[:512])
+                    return True
+
+                api.enumerate(child_window, parent=hwnd)
+            return True
+
+        api.enumerate(top_window)
+        result["status"] = "observed"
+    except (OSError, AttributeError, ValueError, TypeError) as exc:
+        result.update(status="unavailable", reason=f"{type(exc).__name__}: {exc}")
+    return result
+
+
 async def run_private_studio(executable: Path, directory: Path, script_text: str,
                              receipt_name: str, timeout_seconds: int = 120) -> dict:
     executable = Path(executable).resolve()
@@ -119,6 +245,7 @@ async def run_private_studio(executable: Path, directory: Path, script_text: str
                 break
             await asyncio.sleep(.1)
         else:
+            result["owned_window_diagnostics"] = _owned_window_diagnostics(process)
             result.update(_progress(directory))
             if result["native_progress_observed"]:
                 result["phase"] = "native_export"

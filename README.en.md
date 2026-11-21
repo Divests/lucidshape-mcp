@@ -133,12 +133,14 @@ Installation, `configure`, and `serve` also support `--toolsets`, `--tools`, `--
 
 ## Tools and workflows
 
-Version **0.8.0** exposes **40 tools** by default, or **49** with `experimental` enabled. The `all` selection adds 8 legacy aliases, for a total of **57**. The client's `tools/list` response is the authoritative source for tool parameters and return schemas.
+Version **0.8.0** exposes **53 tools** by default, or **62** with `experimental` enabled. The `all` selection adds 8 legacy aliases, for a total of **70**. The client's `tools/list` response is the authoritative source for tool parameters and return schemas.
 
 | Task | Common tools |
 | --- | --- |
 | Inspect and export CAD | `catia_inspect_part`, `catia_export_step`, `inspect_cad_geometry` |
 | Connect to an existing LucidStudio session | `studio_get_live_state`, `studio_inspect_current`, `studio_import_step` |
+| Find an operation by its Studio button label | `studio_list_ui_actions`, `studio_list_dialog_controls`, `studio_export_ui_catalog` |
+| Smooth, scale or measure saved photometry | `photometry_apply_ui_action`, `measure_photometry_region` |
 | Process saved models | `inspect_model`, `simulate_model`, `run_parameter_sweep` |
 | Analyze and export light distributions | `analyze_lid`, `compare_photometry`, `export_ies`, `studio_export_photometry_view` |
 | Generate native road and driver views | `generate_road_views`, `studio_generate_static_road_views` |

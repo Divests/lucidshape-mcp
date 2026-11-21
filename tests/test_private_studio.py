@@ -12,6 +12,99 @@ from unittest.mock import Mock, patch
 from lucidshape_mcp import private_studio as studio
 
 
+class FakeWindowTextReader:
+    def __init__(self, windows=None, children=None):
+        self.windows = windows or {}
+        self.children = children or {}
+        self.title_reads = []
+        self.static_reads = []
+
+    def enumerate(self, callback, parent=None):
+        handles = self.children.get(parent, []) if parent is not None else self.windows
+        for hwnd in handles:
+            if not callback(hwnd):
+                break
+
+    def pid(self, hwnd):
+        return self.windows[hwnd]['pid']
+
+    def class_name(self, hwnd):
+        return self.windows[hwnd]['class']
+
+    def title(self, hwnd):
+        self.title_reads.append(hwnd)
+        return self.windows[hwnd].get('title', '')
+
+    def visible(self, hwnd):
+        return True
+
+    def static_text(self, hwnd):
+        self.static_reads.append(hwnd)
+        return self.windows[hwnd].get('text')
+
+
+class OwnedWindowDiagnosticsTests(unittest.TestCase):
+    def setUp(self):
+        self.process = Mock(pid=4242)
+        self.process.poll.return_value = None
+        studio._PROCESSES[4242] = self.process
+        self.addCleanup(studio._PROCESSES.clear)
+
+    def test_only_owned_dialog_static_text_is_read(self):
+        api = FakeWindowTextReader({
+            1: {'pid': 7777, 'class': '#32770', 'title': 'Unrelated private window'},
+            2: {'pid': 4242, 'class': 'Main', 'title': 'LucidShape'},
+            3: {'pid': 4242, 'class': '#32770', 'title': 'No connection'},
+            4: {'pid': 4242, 'class': 'Static', 'text': 'Update check failed'},
+            5: {'pid': 4242, 'class': 'Edit', 'text': 'Must not read'},
+            6: {'pid': 7777, 'class': 'Static', 'text': 'Other process'},
+            7: {'pid': 4242, 'class': 'Button', 'text': 'Do not click'},
+            8: {'pid': 4242, 'class': 'Static', 'text': None},
+        }, {3: [4, 5, 6, 7, 8]})
+        # EnumWindows returns top-level handles only.
+        def enumerate_windows(callback, parent=None):
+            for hwnd in ([1, 2, 3] if parent is None else api.children.get(parent, [])):
+                if not callback(hwnd):
+                    break
+        api.enumerate = enumerate_windows
+        with patch.object(studio, '_WindowTextReader', return_value=api):
+            result = studio._owned_window_diagnostics(self.process)
+        self.assertEqual(api.title_reads, [2, 3])
+        self.assertEqual(api.static_reads, [4, 8])
+        self.assertEqual(result['windows'][1]['static_text'], ['Update check failed'])
+        self.assertEqual(result['windows'][1]['static_text_query_timeouts'], 1)
+        self.assertEqual(result['status'], 'observed')
+        self.process.terminate.assert_not_called()
+
+    def test_no_owned_live_handle_never_enumerates(self):
+        with patch.object(studio, '_WindowTextReader') as reader:
+            studio._PROCESSES.clear()
+            self.assertEqual(studio._owned_window_diagnostics(self.process)['status'], 'skipped')
+            studio._PROCESSES[4242] = self.process
+            self.process.poll.return_value = 1
+            self.assertEqual(studio._owned_window_diagnostics(self.process)['status'], 'skipped')
+        reader.assert_not_called()
+
+    def test_limits_bound_text_reads_and_length(self):
+        windows = {1: {'pid': 4242, 'class': '#32770', 'title': 'x' * 1000}}
+        windows.update({i: {'pid': 4242, 'class': 'Static', 'text': 'y' * 1000} for i in range(2, 102)})
+        api = FakeWindowTextReader(windows, {1: list(range(2, 102))})
+        with patch.object(studio, '_WindowTextReader', return_value=api):
+            result = studio._owned_window_diagnostics(self.process)
+        self.assertTrue(result['truncated'])
+        self.assertLessEqual(len(result['windows']), 32)
+        self.assertEqual(len(api.static_reads), 32)
+        self.assertEqual(len(result['windows'][0]['title']), 512)
+        self.assertTrue(all(len(t) == 512 for t in result['windows'][0]['static_text']))
+
+    def test_unavailable_api_does_not_prevent_cleanup(self):
+        with patch.object(studio, '_WindowTextReader', side_effect=OSError('API unavailable')):
+            result = studio._owned_window_diagnostics(self.process)
+        self.assertEqual(result['status'], 'unavailable')
+        self.assertIn('API unavailable', result['reason'])
+        self.process.terminate.assert_not_called()
+
+
 class PrivateStudioTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -41,7 +134,8 @@ class PrivateStudioTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(studio, 'studio_processes', return_value=[]), \
              patch.object(studio.subprocess, 'Popen', side_effect=launch or (lambda *args, **kwargs: self.process)) as popen, \
              patch.object(studio, 'time', SimpleNamespace(monotonic=lambda: self.now)), \
-             patch.object(studio.asyncio, 'sleep', side_effect=sleep or self.expire):
+             patch.object(studio.asyncio, 'sleep', side_effect=sleep or self.expire), \
+             patch.object(studio, '_WindowTextReader', return_value=FakeWindowTextReader()):
             result = await studio.run_private_studio(
                 self.executable, self.directory, 'void main(){}', 'native-receipt.json', 1)
         popen.assert_called_once()
@@ -89,6 +183,9 @@ class PrivateStudioTests(unittest.IsolatedAsyncioTestCase):
         recorded = json.loads((self.directory / 'launch.json').read_text(encoding='utf-8'))
         self.assertEqual(recorded['error_details']['code'], 'STUDIO_STARTUP_UNCONFIRMED')
         self.assertFalse(recorded['process_left_open'])
+        self.assertEqual(recorded['owned_window_diagnostics'], result['owned_window_diagnostics'])
+        self.assertEqual(result['owned_window_diagnostics']['status'], 'observed')
+        self.assertTrue(result['owned_window_diagnostics']['read_only'])
 
     async def test_timeout_with_native_progress_distinguishes_export_incomplete(self):
         def launch(*args, **kwargs):

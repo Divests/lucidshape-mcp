@@ -9,11 +9,14 @@ from .compatibility import TOOL_ALIASES, operation
 GROUPS = {
     'core': {'get_capabilities', 'get_job', 'list_jobs', 'cancel_job', 'read_job_log', 'health_check'},
     'studio': {'studio_open_file', 'studio_get_live_state', 'studio_inspect_current', 'studio_get_api_catalog',
-               'studio_inspect_objects', 'studio_get_simulation_settings', 'studio_import_step'},
+               'studio_inspect_objects', 'studio_get_simulation_settings', 'studio_import_step',
+               'studio_list_ui_actions', 'studio_get_ui_action', 'studio_list_dialog_controls', 'studio_list_live_menu',
+               'studio_export_ui_catalog', 'studio_get_help_resource', 'studio_run_ui_action'},
     'catia': {'catia_get_state', 'catia_inspect_part', 'catia_export_step', 'catia_show_all',
               'catia_create_plane_mirror', 'catia_convert_step_to_stl', 'catia_export_body_stl'},
-    'geometry': {'inspect_cad_geometry', 'inspect_optical_region_topology', 'import_cad_geometry', 'cancel_geometry_job'},
-    'analysis': {'studio_export_photometry_view', 'studio_generate_static_road_views', 'inspect_rayfile', 'analyze_lid', 'generate_road_views', 'export_ies', 'compare_photometry', 'bin_rayfile', 'replay_rayfile_batch'},
+    'geometry': {'create_geometry_primitive', 'inspect_cad_geometry', 'inspect_optical_region_topology', 'import_cad_geometry', 'cancel_geometry_job'},
+    'analysis': {'measure_photometry_table', 'measure_photometry_region', 'photometry_apply_ui_action', 'studio_export_photometry_view', 'studio_generate_static_road_views', 'inspect_rayfile', 'analyze_lid', 'generate_road_views', 'export_ies', 'compare_photometry', 'bin_rayfile', 'replay_rayfile_batch',
+                 'list_lighting_standards', 'evaluate_vehicle_lighting'},
     'simulation': {'inspect_model', 'inspect_optical_parameters', 'set_emitter_parameters', 'simulate_model',
                    'run_parameter_sweep', 'submit_demo_simulation', 'prepare_cad_mirror_scene'},
     'experimental': {'preflight_optical_scene', 'validate_traversal_absorption', 'trace_optical_paths', 'merge_optical_batches',
@@ -24,10 +27,12 @@ GROUPS = {
 ALL_TOOLS = set().union(*GROUPS.values())
 DEFAULT_GROUPS = tuple(name for name in GROUPS if name not in ('experimental','legacy'))
 READ_ONLY = {
+    'studio_list_ui_actions', 'studio_get_ui_action', 'studio_list_dialog_controls',
+    'studio_list_live_menu', 'studio_export_ui_catalog', 'studio_get_help_resource', 'measure_photometry_region',
     'get_capabilities', 'get_job', 'list_jobs', 'read_job_log', 'studio_get_live_state', 'studio_inspect_current',
     'studio_get_api_catalog', 'studio_inspect_objects', 'studio_get_simulation_settings', 'catia_get_state',
     'catia_inspect_part', 'inspect_cad_geometry', 'inspect_optical_region_topology', 'inspect_rayfile',
-    'inspect_model', 'inspect_optical_parameters', 'analyze_lid', 'compare_photometry',
+    'inspect_model', 'inspect_optical_parameters', 'measure_photometry_table', 'analyze_lid', 'compare_photometry', 'list_lighting_standards',
 }
 ACTIVE_POLICY = ContextVar('lucidshape_active_policy', default=None)
 
@@ -94,6 +99,9 @@ class Policy:
             raise PermissionError('Tool is disabled by server policy')
         if name == 'catia_show_all' and not self.allow_source_writes:
             raise PermissionError('catia_show_all can save the source; enable LUCIDSHAPE_ALLOW_SOURCE_WRITES explicitly')
+        if name == "evaluate_vehicle_lighting" and arguments.get("config_path") is not None:
+            from .vehicle_lighting import local_path
+            local_path(arguments["config_path"])
         for key, value in arguments.items():
             if value is not None and (key.endswith('_path') or key == 'file_path'):
                 self.check_path(value)

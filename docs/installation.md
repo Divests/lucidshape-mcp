@@ -30,7 +30,7 @@ py -3.12 scripts/bootstrap.py --lucidshape-exe "C:\Program Files\LucidShape\BIN6
 
 DeepSeek Harness（DSH）不读取这些文件，需要把 `mcp.local.json` 里的启动字段搬进一个配置型组合包，并且虚拟环境要装在 DSH 工作区之外；步骤见 [DSH 接入](dsh.md)。
 
-Codex 的 stdio 配置使用 `command`、`args` 和 `env`；生成的 TOML 格式依据 [OpenAI 官方 MCP 文档](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)。客户端重连后，默认应能发现 40 个工具（启用实验组后为 49 个，`all` 包含旧别名共 57 个）。
+Codex 的 stdio 配置使用 `command`、`args` 和 `env`；生成的 TOML 格式依据 [OpenAI 官方 MCP 文档](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)。客户端重连后，默认应能发现 53 个工具（启用实验组后为 62 个，`all` 包含旧别名共 70 个）。
 
 生成文件使用本机解释器和绝对路径，只留在 `local-data`，不上传 Git。换电脑只传源码，重新安装；目录改名后重新运行安装/配置命令，不把旧虚拟环境和配置当作可移植安装包。
 
@@ -65,3 +65,9 @@ local-data\venv\Scripts\python.exe -m lucidshape_mcp configure --harness all --l
 | `doctor` 通过但 GPU 失败 | 环境诊断没有执行 GPU 追迹；需要独立的许可、GPU 后端和数值验证 |
 
 MCP SDK 使用 `>=1.30.0,<2`，保留 v1 API。官方明确说明 v2 存在不兼容变更，未迁移项目应保留 `<2` 上界，见 [MCP SDK 安装说明](https://py.sdk.modelcontextprotocol.io/get-started/installation/)。
+
+## 可选整车灯光评价引擎
+
+将本机私有运行时安装在仓库的 `local-data/VehicleLighting-Windows`，或在服务进程设置 `LUCIDSHAPE_LIGHTING_RUNTIME` 为其绝对目录。服务使用其中的固定入口 `vehicle_lighting.py`。通过 `list_lighting_standards` 查询实际安装的规则及模板。评价任务接受一个项目对象或绝对路径 `config_path`。项目对象须填写绝对 IES 路径，项目文件中的相对 IES 路径按该文件所在目录解析。服务对项目文件和灯具 IES 都应用 `LUCIDSHAPE_ALLOWED_ROOTS`，随后使用作业快照计算。
+
+直接传入的项目上限为 4 MiB。包含长时间采样轨迹的项目可以通过 `config_path` 提交，上限为 64 MiB。每个作业的 IES 快照合计上限为 256 MiB。

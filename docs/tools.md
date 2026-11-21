@@ -1,6 +1,6 @@
 # MCP 工具目录
 
-当前服务默认开放 40 个工具，启用 `experimental` 后共 49 个规范工具；另启用 `legacy` 的 8 个旧别名后共 57 个。客户端 `tools/list` 返回的 schema 为调用依据；分组、只读、文件权限和升级行为见 [任务和权限](operations.md)。
+当前服务默认开放 53 个工具，启用 `experimental` 后共 62 个规范工具；另启用 `legacy` 的 8 个旧别名后共 70 个。客户端 `tools/list` 返回的 schema 为调用依据；分组、只读、文件权限和升级行为见 [任务和权限](operations.md)。
 
 ## 返回方式
 
@@ -10,7 +10,17 @@
 
 | 工具 | 功能 |
 | --- | --- |
+| `studio_list_ui_actions`、`studio_get_ui_action` | 按按钮提示、菜单名称、命令符号或路径定位声明。详情包含安装文件、行号、调用入口和参数预设 |
+| `studio_run_ui_action` | 用清单中的 `action_id` 和目标工具所需的参数执行已接入的操作；保留目标工具的作业编号、权限和错误回执 |
+| `studio_export_ui_catalog` | 在工作目录生成完整 UTF-8 JSON，含菜单、工具栏、对话框控件、来源与当前策略下的工具映射 |
+| `studio_list_dialog_controls`、`studio_list_live_menu` | 前者搜索安装脚本中的控件定义。后者读取当前 Studio 窗口公开的原生菜单及启用、勾选状态 |
+| `studio_get_help_resource` | 从帮助菜单条目的 ID 找到本机对应 PDF，并核对文件签名 |
+| `create_geometry_primitive` | 在新模型中创建给定尺寸的基本曲面或形状，保存 .lue 后重新加载并检查几何 |
+| `photometry_apply_ui_action` | 在配光副本上执行原生均化、缩放、镜像、对称等操作，导出 IES 并逐格回读 |
+| `measure_photometry_region` | 在已保存的 Type A 坎德拉配光上执行点值、区域极值、全局最小或最大、区域均值、角域光通量和分区光通量测量 |
 | `get_capabilities` | 查看引擎路径和可用模板；不启动软件 |
+| `list_lighting_standards` | 列出本机已安装的灯光评价体系，按规则 ID 和 ADB 配置查询录入模板 |
+| `evaluate_vehicle_lighting` | 提交整车灯光项目，轮询 `get_job` 取得各体系独立分项、缺项及 JSON/XLSX 报告 |
 | `catia_get_state` | 只读连接已运行的 CATIA，返回文档路径、当前文档、Saved 与 ReadOnly 状态 |
 | `catia_inspect_part` | 只读检查已打开的指定 CATPart，返回零件属性、参数、特征名称、根轴系和几何参数中的轴系、Part/Body 材料查询；不打开副本或保存修改 |
 | `catia_export_step` | 备份后复用已打开的目标文档导出 STEP；默认拒绝未保存内容，明确指定 `include_unsaved:true` 可导出当前内存几何。目标未打开时才使用私有副本，仅关闭确认由该任务新建且未修改的副本文档 |
@@ -46,6 +56,7 @@
 | `prepare_optical_regions` | 按 region_roles 缝合并定向参考实体对应的镀层/透射两类曲面分区，另存 STEP/STL/法线网格；支持显式附加闭合实体，保留原件 |
 | `cancel_geometry_job` | 兼容旧入口，仅接受当前任务目录的几何任务记录，通过所有者处理取消；不终止 CATIA 或 Studio |
 | `simulate_model` | 对已保存的模型运行正向追迹，每个传感器导出一份独立 `.lid` |
+| `measure_photometry_table` | 对已照准的 Type A、二维非光谱坎德拉 IES/LID 调用 LucidShape 原生 LidMeasureTable。选择 `gb4599_2024_lb`（基础近光，表 1 A）或 `gb4599_2024_hb`（中性远光，表 5），用 `get_job` 读取逐项光强、限值、判定及原生文本。按文件已有坐标和光通量做工程校核，线 10 及以下保留有限角域标识。 |
 | `analyze_lid` | 分析二维非光谱坎德拉 LID 或 IES（IES 使用原生 IESData），返回峰值及角度、角度范围内光通量、可选区域光通量 |
 | `compare_photometry` | 比较同网格、同角度约定的二维非光谱 LID/IES，返回有正负号的候选减参考差异、RMSE、MAE、角域通量变化和 CSV |
 | `inspect_optical_parameters` | 从保存的模型副本读取支持的光源参数、部分介质字段、材质关系和传感器元数据；不读取当前 Studio |
@@ -61,6 +72,12 @@
 | `read_job_log` | 获取任务日志末尾 |
 
 ## 调用注意
+
+### 按 LucidShape 按钮查找工具
+
+搜索 `studio_list_ui_actions(query="Basic Smoothing", executable_only=true)`，读取条目的 `execution.tool` 和 `preset_arguments`。例如，在 `photometry_apply_ui_action` 中传入 IES 绝对路径、`command="CM_UV_FILTER"` 和 `passes=1`，即可对副本均化一次。在 `measure_photometry_region` 中传入其输出、`mode="point"`、`coordinates_deg=[-4,2]` 和 `unit="cd"` 可读取同一位置的光强。两次调用均通过 `get_job` 获取结果。
+
+默认 `profile="studio"` 读取当前安装的主菜单及引用定义。`profile="all"` 同时读取其他产品、历史菜单和条件声明。菜单与工具栏可以引用同一个操作。`catalog_only` 表示目前只有定义，`disabled_by_policy` 表示目标工具在当前策略下关闭。`available` 表示有对应的 MCP 工具，具体支持的文件、参数和作用范围见 `execution.scope`。许可、当前模型、选区和对话框状态还会影响现场可用性。
 
 现有 CATIA 会话中的未保存修改不会默认写回源文件。需要导出当前内存状态或保存全部改动时，分别使用明确的 `include_unsaved`、`save_as_source` 参数并确认操作范围。
 
@@ -87,7 +104,11 @@
 
 `studio_export_photometry_view` 使用 `UVView.snapshotBitmap` 导出带原生坐标及色标的 PNG。`width_px`、`height_px` 指定导出尺寸，`view_bounds` 指定显示范围，`value_range` 为对数色标范围，`contours` 指定等值线。IES 的坐标单位为角度，平面 LID 使用数据自身的坐标单位。
 
-`quantity: candela` 要求坎德拉输入，`quantity: native` 保留原生量纲。工具不把光强转换为 25 m 屏照度。报告应依据实际数据标注 cd、lx 等单位，避免将颜色相似的图混为同一物理量。
+`quantity: candela` 要求坎德拉输入，`quantity: native` 保留原生量纲。`quantity: illuminance_25m` 也只接受坎德拉输入，切换原生视图为 **I/625 的25 m等效照度（lx）**，不修改配光数组或输入文件；它不表示含离轴入射/距离修正的实际平面屏照度，也不支持任意距离。`value_range` 与 `contours` 按当前显示单位填写，先切换显示量、读回属性，再应用范围与等值线；导出回执检查所请求模式和参数。
+
+`display_mode` 可为 `spectrum`（默认）、`grayscale`、`contours`、`color_contours`、`bands`；`scale_mode` 可为 `logarithmic`（默认）、`linear`、`munsell`；`show_contours` 默认 true，控制等值线叠加；`contours` / `color_contours` 模式要求此值为 true，拒绝矛盾设置。`gamma_correction` 默认 null，保留原生显示伽马开关；显式 true/false 会设置并回读校验。它不是曝光倍率，也不改变输入光强；需要线性灰度对照时应显式 false。坐标、网格、色标仍保留。每个组合的图像含义和效果需要按实际导出检查，代码路径存在不等于全部组合已经完成原生验证。
+
+输入单位标志、角度类型、峰值和积分在创建视图及显示设置之前捕获（`source_metrics_capture_stage`）；部分原生显示切换会改变内存数据的单位标志，不能用切换后的标志重新判断输入量纲。回执中的 `native_peak_value_u_v` 始终是捕获的原生输入数据峰值及坐标；25m模式另给 `derived_display_peak_value_u_v`，明确是按 I/625 推导的值，不能宣称独立读取了视图中的峰值文本。`display_transform` 记录显示换算，原始光通量不缩放。报告应依据实际模式标注 cd、lx 等单位。
 
 ### Static Road 图
 

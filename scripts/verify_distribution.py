@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 import zipfile
 
-from check_repository import allowed_path
+from check_repository import PACKAGE_DATA_FILES, allowed_path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,7 +28,7 @@ def main():
     sdists = list(args.dist.glob('*.tar.gz'))
     if len(wheels) != 1 or len(sdists) != 1:
         raise SystemExit('Use a directory with exactly one wheel and one sdist')
-    expected = {
+    expected = PACKAGE_DATA_FILES | {
         p.relative_to(ROOT).as_posix()
         for p in (ROOT / 'lucidshape_mcp').rglob('*') if p.suffix in {'.py', '.do', '.lus'}
     }
